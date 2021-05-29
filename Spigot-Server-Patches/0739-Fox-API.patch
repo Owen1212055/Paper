@@ -4,6 +4,59 @@ Date: Fri, 28 May 2021 21:07:08 -0400
 Subject: [PATCH] Fox API
 
 
+diff --git a/src/main/java/net/minecraft/world/entity/animal/EntityFox.java b/src/main/java/net/minecraft/world/entity/animal/EntityFox.java
+index b7fa24318ef43918b6b10ff4ea8acb960527296e..c1c5c8fdc603877b39506a319f90294bbf840c2c 100644
+--- a/src/main/java/net/minecraft/world/entity/animal/EntityFox.java
++++ b/src/main/java/net/minecraft/world/entity/animal/EntityFox.java
+@@ -397,18 +397,22 @@ public class EntityFox extends EntityAnimal {
+         this.d(1, flag);
+     }
+ 
++    public boolean isWalking() {return eN();} // Paper - OBFHELPER
+     public boolean eN() {
+         return this.t(64);
+     }
+ 
++    public void setWalking(boolean walking) {x(walking);} // Paper - OBFHELPER
+     private void x(boolean flag) {
+         this.d(64, flag);
+     }
+ 
++    public boolean isAngry() {return fb();} // Paper - OBFHELPER
+     private boolean fb() {
+         return this.t(128);
+     }
+ 
++    public void setAngry(boolean angry) {y(angry);} // Paper - OBFHELPER
+     private void y(boolean flag) {
+         this.d(128, flag);
+     }
+@@ -541,10 +545,12 @@ public class EntityFox extends EntityAnimal {
+         ((EntityFox) entityinsentient).b(entityhuman.getUniqueID());
+     }
+ 
++    public boolean isLeaping() {return eO();} // Paper - OBFHELPER
+     public boolean eO() {
+         return this.t(16);
+     }
+ 
++    public void setLeaping(boolean leaping) {u(leaping);} // Paper - OBFHELPER
+     public void u(boolean flag) {
+         this.d(16, flag);
+     }
+@@ -561,10 +567,12 @@ public class EntityFox extends EntityAnimal {
+         return this.t(4);
+     }
+ 
++    public void setHeadTilted(boolean tilted) {w(tilted);} // Paper - OBFHELPER
+     public void w(boolean flag) {
+         this.d(8, flag);
+     }
+ 
++    public boolean isHeadTilted() {return eW();} // Paper - OBFHELPER
+     public boolean eW() {
+         return this.t(8);
+     }
 diff --git a/src/main/java/org/bukkit/craftbukkit/entity/CraftFox.java b/src/main/java/org/bukkit/craftbukkit/entity/CraftFox.java
 index 362ac8e43096995184c2d13ccdd69a84103a791c..b4a1b1bc1678b7380e438ab94c28f37e77e240ce 100644
 --- a/src/main/java/org/bukkit/craftbukkit/entity/CraftFox.java
