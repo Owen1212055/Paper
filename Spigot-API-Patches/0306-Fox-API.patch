@@ -1,0 +1,74 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Owen1212055 <23108066+Owen1212055@users.noreply.github.com>
+Date: Fri, 28 May 2021 21:06:59 -0400
+Subject: [PATCH] Fox API
+
+
+diff --git a/src/main/java/org/bukkit/entity/Fox.java b/src/main/java/org/bukkit/entity/Fox.java
+index 498e182846b81d50b3a594254e8b341fb23e8763..bf2f02a9d3ea4914e69d48bde66e7a19a711adb1 100644
+--- a/src/main/java/org/bukkit/entity/Fox.java
++++ b/src/main/java/org/bukkit/entity/Fox.java
+@@ -85,4 +85,63 @@ public interface Fox extends Animals, Sittable {
+         RED,
+         SNOW;
+     }
++
++    // Paper start - Add more fox behavior API
++    /**
++     * Sets if the fox's head is tilted.
++     * <p>
++     *
++     * @param tilted head is tilted or not
++     */
++    public void setHeadTilted(boolean tilted);
++
++    /**
++     * Gets if the fox's head is tilted.
++     *
++     * @return fox's head is tilted
++     */
++    public boolean isHeadTilted();
++
++    /**
++     * Sets if the fox is leaping or not.
++     *
++     * @param leaping is leaping
++     */
++    public void setLeaping(boolean leaping);
++
++    /**
++     * Gets if the fox is leaping.
++     *
++     * @return fox is leaping
++     */
++    public boolean isLeaping();
++
++    /**
++     * Sets if the fox is angry or not.
++     *
++     * @param angry is angry
++     */
++    public void setAngry(boolean angry);
++
++    /**
++     * Gets if the fox is angry.
++     *
++     * @return fox is angry
++     */
++    public boolean isAngry();
++
++    /**
++     * Sets if the fox is walking or not.
++     *
++     * @param walking is walking
++     */
++    public void setWalking(boolean walking);
++
++    /**
++     * Gets if the fox is walking.
++     *
++     * @return fox is walking
++     */
++    public boolean isWalking();
++    // Paper end - Add more fox behavior API
+ }
