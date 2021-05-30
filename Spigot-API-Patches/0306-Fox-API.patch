@@ -5,32 +5,31 @@ Subject: [PATCH] Fox API
 
 
 diff --git a/src/main/java/org/bukkit/entity/Fox.java b/src/main/java/org/bukkit/entity/Fox.java
-index 498e182846b81d50b3a594254e8b341fb23e8763..bf2f02a9d3ea4914e69d48bde66e7a19a711adb1 100644
+index 498e182846b81d50b3a594254e8b341fb23e8763..3826363a1954afcddaadec7f96ac18300f8e89e9 100644
 --- a/src/main/java/org/bukkit/entity/Fox.java
 +++ b/src/main/java/org/bukkit/entity/Fox.java
-@@ -85,4 +85,63 @@ public interface Fox extends Animals, Sittable {
+@@ -85,4 +85,62 @@ public interface Fox extends Animals, Sittable {
          RED,
          SNOW;
      }
 +
 +    // Paper start - Add more fox behavior API
 +    /**
-+     * Sets if the fox's head is tilted.
-+     * <p>
++     * Sets if the fox is interested.
 +     *
-+     * @param tilted head is tilted or not
++     * @param interested is interested
 +     */
-+    public void setHeadTilted(boolean tilted);
++    public void setInterested(boolean interested);
 +
 +    /**
-+     * Gets if the fox's head is tilted.
++     * Gets if the fox is interested.
 +     *
-+     * @return fox's head is tilted
++     * @return fox is interested
 +     */
-+    public boolean isHeadTilted();
++    public boolean isInterested();
 +
 +    /**
-+     * Sets if the fox is leaping or not.
++     * Sets if the fox is leaping.
 +     *
 +     * @param leaping is leaping
 +     */
@@ -44,31 +43,31 @@ index 498e182846b81d50b3a594254e8b341fb23e8763..bf2f02a9d3ea4914e69d48bde66e7a19
 +    public boolean isLeaping();
 +
 +    /**
-+     * Sets if the fox is angry or not.
++     * Sets if the fox is defending.
 +     *
-+     * @param angry is angry
++     * @param defending is defending
 +     */
-+    public void setAngry(boolean angry);
++    public void setDefending(boolean defending);
 +
 +    /**
-+     * Gets if the fox is angry.
++     * Gets if the fox is defending.
 +     *
-+     * @return fox is angry
++     * @return fox is defending
 +     */
-+    public boolean isAngry();
++    public boolean isDefending();
 +
 +    /**
-+     * Sets if the fox is walking or not.
++     * Sets if the fox face planted.
 +     *
-+     * @param walking is walking
++     * @param faceplanted face planted
 +     */
-+    public void setWalking(boolean walking);
++    public void setFaceplanted(boolean faceplanted);
 +
 +    /**
-+     * Gets if the fox is walking.
++     * Gets if the fox face planted.
 +     *
-+     * @return fox is walking
++     * @return fox face planted
 +     */
-+    public boolean isWalking();
++    public boolean isFaceplanted();
 +    // Paper end - Add more fox behavior API
  }

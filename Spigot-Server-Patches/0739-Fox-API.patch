@@ -5,29 +5,29 @@ Subject: [PATCH] Fox API
 
 
 diff --git a/src/main/java/net/minecraft/world/entity/animal/EntityFox.java b/src/main/java/net/minecraft/world/entity/animal/EntityFox.java
-index b7fa24318ef43918b6b10ff4ea8acb960527296e..c1c5c8fdc603877b39506a319f90294bbf840c2c 100644
+index b7fa24318ef43918b6b10ff4ea8acb960527296e..de142a7387740bfd9c656b8cd46a08554fc3ce16 100644
 --- a/src/main/java/net/minecraft/world/entity/animal/EntityFox.java
 +++ b/src/main/java/net/minecraft/world/entity/animal/EntityFox.java
 @@ -397,18 +397,22 @@ public class EntityFox extends EntityAnimal {
          this.d(1, flag);
      }
  
-+    public boolean isWalking() {return eN();} // Paper - OBFHELPER
++    public boolean isFaceplanted() {return eN();} // Paper - OBFHELPER
      public boolean eN() {
          return this.t(64);
      }
  
-+    public void setWalking(boolean walking) {x(walking);} // Paper - OBFHELPER
++    public void setFaceplanted(boolean faceplanted) {x(faceplanted);} // Paper - OBFHELPER
      private void x(boolean flag) {
          this.d(64, flag);
      }
  
-+    public boolean isAngry() {return fb();} // Paper - OBFHELPER
++    public boolean isDefending() {return fb();} // Paper - OBFHELPER
      private boolean fb() {
          return this.t(128);
      }
  
-+    public void setAngry(boolean angry) {y(angry);} // Paper - OBFHELPER
++    public void setDefending(boolean defending) {y(defending);} // Paper - OBFHELPER
      private void y(boolean flag) {
          this.d(128, flag);
      }
@@ -48,17 +48,17 @@ index b7fa24318ef43918b6b10ff4ea8acb960527296e..c1c5c8fdc603877b39506a319f90294b
          return this.t(4);
      }
  
-+    public void setHeadTilted(boolean tilted) {w(tilted);} // Paper - OBFHELPER
++    public void setInterested(boolean interested) {w(interested);} // Paper - OBFHELPER
      public void w(boolean flag) {
          this.d(8, flag);
      }
  
-+    public boolean isHeadTilted() {return eW();} // Paper - OBFHELPER
++    public boolean isInterested() {return eW();} // Paper - OBFHELPER
      public boolean eW() {
          return this.t(8);
      }
 diff --git a/src/main/java/org/bukkit/craftbukkit/entity/CraftFox.java b/src/main/java/org/bukkit/craftbukkit/entity/CraftFox.java
-index 362ac8e43096995184c2d13ccdd69a84103a791c..b4a1b1bc1678b7380e438ab94c28f37e77e240ce 100644
+index 362ac8e43096995184c2d13ccdd69a84103a791c..2511d7009e7d6c3459acb899274c1a715545e7e2 100644
 --- a/src/main/java/org/bukkit/craftbukkit/entity/CraftFox.java
 +++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftFox.java
 @@ -115,4 +115,45 @@ public class CraftFox extends CraftAnimals implements Fox {
@@ -67,13 +67,13 @@ index 362ac8e43096995184c2d13ccdd69a84103a791c..b4a1b1bc1678b7380e438ab94c28f37e
      }
 +    // Paper start - Add more fox behavior API
 +    @Override
-+    public void setHeadTilted(boolean tilted) {
-+        getHandle().setHeadTilted(tilted);
++    public void setInterested(boolean interested) {
++        getHandle().setInterested(interested);
 +    }
 +
 +    @Override
-+    public boolean isHeadTilted() {
-+        return getHandle().isHeadTilted();
++    public boolean isInterested() {
++        return getHandle().isInterested();
 +    }
 +
 +    @Override
@@ -87,23 +87,23 @@ index 362ac8e43096995184c2d13ccdd69a84103a791c..b4a1b1bc1678b7380e438ab94c28f37e
 +    }
 +
 +    @Override
-+    public void setAngry(boolean angry) {
-+        getHandle().setAngry(angry);
++    public void setDefending(boolean defending) {
++        getHandle().setDefending(defending);
 +    }
 +
 +    @Override
-+    public boolean isAngry() {
-+        return getHandle().isAngry();
++    public boolean isDefending() {
++        return getHandle().isDefending();
 +    }
 +
 +    @Override
-+    public void setWalking(boolean walking) {
-+        getHandle().setWalking(walking);
++    public void setFaceplanted(boolean faceplanted) {
++        getHandle().setFaceplanted(faceplanted);
 +    }
 +
 +    @Override
-+    public boolean isWalking() {
-+        return getHandle().isWalking();
++    public boolean isFaceplanted() {
++        return getHandle().isFaceplanted();
 +    }
 +    // Paper end - Add more fox behavior API
  }
