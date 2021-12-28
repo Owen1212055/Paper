@@ -1,0 +1,3 @@
+- Implement wrappers for craft bukkit types
+- Try to support serialization
+- replace all references to itemstack in api and replace it with an underlying nms stack
