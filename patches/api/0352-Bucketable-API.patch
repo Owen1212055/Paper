@@ -75,3 +75,34 @@ index 82e390b2152e7c881006ca30f2527d160c01f8a1..86da8dc401ed7db19a39bc682721055c
   */
 -public interface Fish extends WaterMob { }
 +public interface Fish extends WaterMob, io.papermc.paper.entity.Bucketable { } // Paper - Bucketable API
+diff --git a/src/main/java/org/bukkit/event/player/PlayerBucketEntityEvent.java b/src/main/java/org/bukkit/event/player/PlayerBucketEntityEvent.java
+index e0ce294b545dbe9d40970743289d7bfde016b840..ddc2289dffcfaf4944a082e456dc8a93872bbc73 100644
+--- a/src/main/java/org/bukkit/event/player/PlayerBucketEntityEvent.java
++++ b/src/main/java/org/bukkit/event/player/PlayerBucketEntityEvent.java
+@@ -30,12 +30,26 @@ public class PlayerBucketEntityEvent extends PlayerEvent implements Cancellable
+      * Gets the {@link Entity} being put into the bucket.
+      *
+      * @return The {@link Entity} being put into the bucket
++     * @deprecated Use {@link #getBucketed()} to get the bucketed entity instead
+      */
+     @NotNull
++    @Deprecated // Paper - Bucketable API
+     public Entity getEntity() {
+         return entity;
+     }
+ 
++    // Paper start - Bucketable API
++    /**
++     * Gets the {@link io.papermc.paper.entity.Bucketable} being put into the bucket.
++     *
++     * @return The {@link io.papermc.paper.entity.Bucketable} being put into the bucket
++     */
++    @NotNull
++    public io.papermc.paper.entity.Bucketable getBucketed() {
++        return (io.papermc.paper.entity.Bucketable) entity;
++    }
++    // Paper end - Bucketable API
++
+     /**
+      * Gets the bucket used to capture the {@link Entity}.
+      *
