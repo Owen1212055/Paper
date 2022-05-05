@@ -6,7 +6,7 @@ Subject: [PATCH] Optimise collision checking in player move packet handling
 Move collision logic to just the hasNewCollision call instead of getCubes + hasNewCollision
 
 diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index 7be8b98a61c3d92ef7c473983fe620047a137630..761a87be91e82841632f4f46dec799ae28f05887 100644
+index 7be8b98a61c3d92ef7c473983fe620047a137630..003ec08571925e72e5d8b77c5fb550d926d1274b 100644
 --- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 @@ -587,7 +587,7 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Ser
@@ -88,15 +88,6 @@ index 7be8b98a61c3d92ef7c473983fe620047a137630..761a87be91e82841632f4f46dec799ae
      }
  
      @Override
-@@ -1251,7 +1285,7 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Ser
-                 }
- 
-                 if (this.awaitingPositionFromClient != null) {
--                    if (this.tickCount - this.awaitingTeleportTime > 20) {
-+                    if (false && this.tickCount - this.awaitingTeleportTime > 20) { // Paper - this will greatly screw with clients with > 1000ms RTT
-                         this.awaitingTeleportTime = this.tickCount;
-                         this.teleport(this.awaitingPositionFromClient.x, this.awaitingPositionFromClient.y, this.awaitingPositionFromClient.z, this.player.getYRot(), this.player.getXRot());
-                     }
 @@ -1345,7 +1379,7 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Ser
                                  }
                              }
