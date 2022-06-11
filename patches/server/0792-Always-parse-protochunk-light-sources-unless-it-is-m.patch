@@ -8,10 +8,10 @@ Chunks not marked as lit will always go through the light engine,
 so they should always have their block sources parsed.
 
 diff --git a/src/main/java/net/minecraft/world/level/chunk/storage/ChunkSerializer.java b/src/main/java/net/minecraft/world/level/chunk/storage/ChunkSerializer.java
-index b479c4a617becd3f31080ade0388c50727a56ba0..184d1742e5943f4a438e33fcf19f96196a3824e8 100644
+index ceb05453fd24826cf9e9167cbd361d6cfa9cb128..48821a5a1cc91e76bcfa0cb9a16ffa2855c24c3d 100644
 --- a/src/main/java/net/minecraft/world/level/chunk/storage/ChunkSerializer.java
 +++ b/src/main/java/net/minecraft/world/level/chunk/storage/ChunkSerializer.java
-@@ -331,16 +331,33 @@ public class ChunkSerializer {
+@@ -323,16 +323,33 @@ public class ChunkSerializer {
              BelowZeroRetrogen belowzeroretrogen = protochunk.getBelowZeroRetrogen();
              boolean flag5 = chunkstatus.isOrAfter(ChunkStatus.LIGHT) || belowzeroretrogen != null && belowzeroretrogen.targetStatus().isOrAfter(ChunkStatus.LIGHT);
  
