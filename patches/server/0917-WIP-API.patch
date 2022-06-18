@@ -1,0 +1,583 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Owen1212055 <23108066+Owen1212055@users.noreply.github.com>
+Date: Fri, 17 Jun 2022 21:02:32 -0400
+Subject: [PATCH] WIP API
+
+
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/CustomDamageSourceWrapper.java b/src/main/java/io/papermc/paper/world/damagesource/CustomDamageSourceWrapper.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..3f5d9862061c4059eaaa0085886f6ce9e82b1bc3
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/CustomDamageSourceWrapper.java
+@@ -0,0 +1,67 @@
++package io.papermc.paper.world.damagesource;
++
++import io.papermc.paper.adventure.PaperAdventure;
++import net.minecraft.network.chat.Component;
++import net.minecraft.world.damagesource.DamageSource;
++import net.minecraft.world.entity.LivingEntity;
++
++public class CustomDamageSourceWrapper extends DamageSource {
++
++    private final io.papermc.paper.world.damagesource.DamageSource source;
++
++
++    public CustomDamageSourceWrapper(io.papermc.paper.world.damagesource.DamageSource source) {
++        super(source.getName());
++        this.source = source;
++        if (source.damageHelmet()) {
++            this.damageHelmet();
++        }
++        if (source.bypassArmor()) {
++            this.bypassArmor();
++        }
++        if (source.bypassInvulnerability()) {
++            this.bypassInvul();
++        }
++        if (source.bypassMagic()) {
++            this.bypassMagic();
++        }
++        if (source.bypassEnchantments()) {
++            this.bypassEnchantments();
++        }
++        if (!source.causeAggro()) {
++            this.setNoAggro();
++        }
++        if (source.scalesWithDifficulty()) {
++            this.scalesWithDifficulty();
++        }
++        if (source.isProjectile()) {
++            this.setProjectile();
++        }
++        if (source.isExplosion()) {
++            this.setExplosion();
++        }
++        if (source.isFire()) {
++            this.setIsFire();
++        }
++        if (source.isMagic()) {
++            this.setMagic();
++        }
++        if (source.isFall()) {
++            this.setIsFall();
++        }
++    }
++
++    @Override
++    public float getFoodExhaustion() {
++        return this.source.getFoodExhaustion();
++    }
++
++    @Override
++    public Component getLocalizedDeathMessage(LivingEntity entity) {
++        return PaperAdventure.asVanilla(this.source.deathMessage(entity.getBukkitLivingEntity()));
++    }
++
++    public io.papermc.paper.world.damagesource.DamageSource getSource() {
++        return source;
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/CustomEntityDamageSourceWrapper.java b/src/main/java/io/papermc/paper/world/damagesource/CustomEntityDamageSourceWrapper.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1bfb7acc40b900cff2bfed5dd944a4a73648217c
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/CustomEntityDamageSourceWrapper.java
+@@ -0,0 +1,75 @@
++package io.papermc.paper.world.damagesource;
++
++import io.papermc.paper.adventure.PaperAdventure;
++import net.minecraft.network.chat.Component;
++import net.minecraft.world.damagesource.DamageSource;
++import net.minecraft.world.entity.LivingEntity;
++import org.bukkit.craftbukkit.entity.CraftEntity;
++
++public class CustomEntityDamageSourceWrapper extends net.minecraft.world.damagesource.EntityDamageSource {
++
++    private final EntityDamageSource source;
++
++
++    public CustomEntityDamageSourceWrapper(EntityDamageSource source) {
++        super(source.getName(), ((CraftEntity) source.getSource()).getHandle());
++        this.source = source;
++
++        // Damage Source
++        if (source.damageHelmet()) {
++            this.damageHelmet();
++        }
++        if (source.bypassArmor()) {
++            this.bypassArmor();
++        }
++        if (source.bypassInvulnerability()) {
++            this.bypassInvul();
++        }
++        if (source.bypassMagic()) {
++            this.bypassMagic();
++        }
++        if (source.bypassEnchantments()) {
++            this.bypassEnchantments();
++        }
++        if (!source.causeAggro()) {
++            this.setNoAggro();
++        }
++        if (source.scalesWithDifficulty()) {
++            this.scalesWithDifficulty();
++        }
++        if (source.isProjectile()) {
++            this.setProjectile();
++        }
++        if (source.isExplosion()) {
++            this.setExplosion();
++        }
++        if (source.isFire()) {
++            this.setIsFire();
++        }
++        if (source.isMagic()) {
++            this.setMagic();
++        }
++        if (source.isFall()) {
++            this.setIsFall();
++        }
++
++        // Entity Damage Source
++        if (source.isThorns()) {
++            this.setThorns();
++        }
++    }
++
++    @Override
++    public float getFoodExhaustion() {
++        return this.source.getFoodExhaustion();
++    }
++
++    @Override
++    public Component getLocalizedDeathMessage(LivingEntity entity) {
++        return PaperAdventure.asVanilla(this.source.deathMessage(entity.getBukkitLivingEntity()));
++    }
++
++    public io.papermc.paper.world.damagesource.DamageSource getSource() {
++        return source;
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/CustomIndirectEntityDamageSourceWrapper.java b/src/main/java/io/papermc/paper/world/damagesource/CustomIndirectEntityDamageSourceWrapper.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..ba2ab4fa2381dd1c3d0c8530642e55ff9810997e
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/CustomIndirectEntityDamageSourceWrapper.java
+@@ -0,0 +1,68 @@
++package io.papermc.paper.world.damagesource;
++
++import io.papermc.paper.adventure.PaperAdventure;
++import net.minecraft.network.chat.Component;
++import net.minecraft.world.entity.LivingEntity;
++import org.bukkit.craftbukkit.entity.CraftEntity;
++
++public class CustomIndirectEntityDamageSourceWrapper extends net.minecraft.world.damagesource.IndirectEntityDamageSource {
++
++    private final EntityDamageSource source;
++
++
++    public CustomIndirectEntityDamageSourceWrapper(IndirectEntityDamageSource source) {
++        super(source.getName(), ((CraftEntity) source.getSource()).getHandle(), ((CraftEntity) source.getDirectCause()).getHandle());
++        this.source = source;
++
++        if (source.damageHelmet()) {
++            this.damageHelmet();
++        }
++        if (source.bypassArmor()) {
++            this.bypassArmor();
++        }
++        if (source.bypassInvulnerability()) {
++            this.bypassInvul();
++        }
++        if (source.bypassMagic()) {
++            this.bypassMagic();
++        }
++        if (source.bypassEnchantments()) {
++            this.bypassEnchantments();
++        }
++        if (!source.causeAggro()) {
++            this.setNoAggro();
++        }
++        if (source.scalesWithDifficulty()) {
++            this.scalesWithDifficulty();
++        }
++        if (source.isProjectile()) {
++            this.setProjectile();
++        }
++        if (source.isExplosion()) {
++            this.setExplosion();
++        }
++        if (source.isFire()) {
++            this.setIsFire();
++        }
++        if (source.isMagic()) {
++            this.setMagic();
++        }
++        if (source.isFall()) {
++            this.setIsFall();
++        }
++    }
++
++    @Override
++    public float getFoodExhaustion() {
++        return this.source.getFoodExhaustion();
++    }
++
++    @Override
++    public Component getLocalizedDeathMessage(LivingEntity entity) {
++        return PaperAdventure.asVanilla(this.source.deathMessage(entity.getBukkitLivingEntity()));
++    }
++
++    public io.papermc.paper.world.damagesource.DamageSource getSource() {
++        return source;
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/DamageSourceAdapter.java b/src/main/java/io/papermc/paper/world/damagesource/DamageSourceAdapter.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..c39880f38226245b0e6d7a08590e6c864ee161f6
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/DamageSourceAdapter.java
+@@ -0,0 +1,68 @@
++package io.papermc.paper.world.damagesource;
++
++import io.papermc.paper.world.damagesource.builders.DamageSourceBuilder;
++import io.papermc.paper.world.damagesource.builders.EntityDamageSourceBuilder;
++import io.papermc.paper.world.damagesource.builders.IndirectEntityDamageSourceBuilder;
++
++import java.lang.reflect.Field;
++import java.util.HashMap;
++import java.util.IdentityHashMap;
++import java.util.Map;
++
++public class DamageSourceAdapter {
++
++    private static final Map<String, PaperDamageSource> sourceMap = new HashMap<>();
++    private static final Map<net.minecraft.world.damagesource.DamageSource, DamageSource> instanceSourceMap = new IdentityHashMap<>();
++    static {
++        try {
++            for (Field field : net.minecraft.world.damagesource.DamageSource.class.getDeclaredFields()) {
++                if (field.getType().isAssignableFrom(net.minecraft.world.damagesource.DamageSource.class)) {
++                    net.minecraft.world.damagesource.DamageSource source = (net.minecraft.world.damagesource.DamageSource) field.get(null);
++
++                    sourceMap.put(source.getMsgId(), new PaperDamageSource(source));
++                    instanceSourceMap.put(source, new PaperDamageSource(source));
++                }
++            }
++        } catch (Exception e) {
++            throw new RuntimeException(e);
++        }
++    }
++
++
++    public static DamageSource adapt(String key) {
++        return sourceMap.get(key);
++    }
++
++    public static DamageSource adapt(net.minecraft.world.damagesource.DamageSource nms) {
++        if (nms instanceof CustomDamageSourceWrapper wrapper) {
++            return wrapper.getSource();
++        }
++
++        DamageSource instance = instanceSourceMap.get(nms);
++        if (instance != null) {
++            return instance;
++        }
++
++        return new PaperDamageSource(nms);
++    }
++
++    public static net.minecraft.world.damagesource.DamageSource adapt(DamageSource api) {
++        if (api instanceof PaperDamageSource wrapper) {
++            return wrapper.getSource();
++        }
++
++        net.minecraft.world.damagesource.DamageSource source;
++        if (api instanceof IndirectEntityDamageSource indirectEntityDamageSource) {
++            source =  new CustomIndirectEntityDamageSourceWrapper(indirectEntityDamageSource);
++        } else if (api instanceof EntityDamageSource damageSource) {
++            source =  new CustomEntityDamageSourceWrapper(damageSource);
++        } else {
++            source = new CustomDamageSourceWrapper(api);
++        }
++
++        return source;
++    }
++
++
++}
++
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/PaperDamageSource.java b/src/main/java/io/papermc/paper/world/damagesource/PaperDamageSource.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..c27bb37e444b1a6b095d77e6572cec6e89d7ecfa
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/PaperDamageSource.java
+@@ -0,0 +1,96 @@
++package io.papermc.paper.world.damagesource;
++
++import io.papermc.paper.adventure.PaperAdventure;
++import net.kyori.adventure.text.Component;
++import org.bukkit.craftbukkit.entity.CraftLivingEntity;
++import org.bukkit.entity.LivingEntity;
++
++public class PaperDamageSource implements DamageSource {
++
++
++    private final net.minecraft.world.damagesource.DamageSource source;
++
++    public PaperDamageSource(net.minecraft.world.damagesource.DamageSource source) {
++        this.source = source;
++    }
++
++    @Override
++    public String getName() {
++        return this.source.getMsgId();
++    }
++
++    @Override
++    public boolean damageHelmet() {
++        return this.source.isDamageHelmet();
++    }
++
++    @Override
++    public float getFoodExhaustion() {
++        return this.source.getFoodExhaustion();
++    }
++
++    @Override
++    public boolean bypassArmor() {
++        return this.source.isBypassArmor();
++    }
++
++    @Override
++    public boolean bypassInvulnerability() {
++        return this.source.isBypassInvul();
++    }
++
++    @Override
++    public boolean bypassMagic() {
++        return this.source.isBypassMagic();
++    }
++
++    @Override
++    public boolean bypassEnchantments() {
++        return this.source.isBypassEnchantments();
++    }
++
++    @Override
++    public boolean causeAggro() {
++        return !this.source.isNoAggro();
++    }
++
++    @Override
++    public boolean scalesWithDifficulty() {
++        return this.source.scalesWithDifficulty();
++    }
++
++    @Override
++    public boolean isProjectile() {
++        return this.source.isProjectile();
++    }
++
++    @Override
++    public boolean isExplosion() {
++        return this.source.isExplosion();
++    }
++
++    @Override
++    public boolean isFire() {
++        return this.source.isFire();
++    }
++
++    @Override
++    public boolean isMagic() {
++        return this.source.isMagic();
++    }
++
++    @Override
++    public boolean isFall() {
++        return this.source.isFall();
++    }
++
++    @Override
++    public Component deathMessage(LivingEntity entity) {
++        net.minecraft.world.entity.LivingEntity livingEntity = ((CraftLivingEntity) entity).getHandle();
++        return PaperAdventure.asAdventure(this.source.getLocalizedDeathMessage(livingEntity));
++    }
++
++    public net.minecraft.world.damagesource.DamageSource getSource() {
++        return source;
++    }
++}
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+index 72311b27bb642ee05dba45b76935277d183012eb..2b9c894558127abacb660f86510a3fd8fbef084d 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -233,6 +233,7 @@ import org.bukkit.scheduler.BukkitWorker;
+ import org.bukkit.structure.StructureManager;
+ import org.bukkit.util.StringUtil;
+ import org.bukkit.util.permissions.DefaultPermissions;
++import org.jetbrains.annotations.NotNull;
+ import org.yaml.snakeyaml.Yaml;
+ import org.yaml.snakeyaml.constructor.SafeConstructor;
+ import org.yaml.snakeyaml.error.MarkedYAMLException;
+diff --git a/src/main/java/org/bukkit/craftbukkit/entity/CraftEnderDragonPart.java b/src/main/java/org/bukkit/craftbukkit/entity/CraftEnderDragonPart.java
+index a407e802164603c74ec1f4ad3c98bc50398954bc..d478266ce5f6052525b47228ffc55fb749f50bfb 100644
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftEnderDragonPart.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftEnderDragonPart.java
+@@ -34,6 +34,12 @@ public class CraftEnderDragonPart extends CraftComplexPart implements EnderDrago
+     public void damage(double amount, Entity source) {
+         this.getParent().damage(amount, source);
+     }
++    // Paper start
++    @Override
++    public void damage(double amount, io.papermc.paper.world.damagesource.DamageSource damageSource) {
++        this.getParent().damage(amount, damageSource);
++    }
++    // Paper end
+ 
+     @Override
+     public double getHealth() {
+diff --git a/src/main/java/org/bukkit/craftbukkit/entity/CraftLivingEntity.java b/src/main/java/org/bukkit/craftbukkit/entity/CraftLivingEntity.java
+index c022751e3b45469cc0ad6732e2d6ff08918bafa4..00fe8bae5b6bfcd1637f3ffac4e67347129fe610 100644
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftLivingEntity.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftLivingEntity.java
+@@ -345,7 +345,7 @@ public class CraftLivingEntity extends CraftEntity implements LivingEntity {
+     // Paper End - Bee Stinger API
+     @Override
+     public void damage(double amount) {
+-        this.damage(amount, null);
++        this.damage(amount, (Entity) null); // Paper
+     }
+ 
+     @Override
+@@ -362,6 +362,12 @@ public class CraftLivingEntity extends CraftEntity implements LivingEntity {
+ 
+         entity.hurt(reason, (float) amount);
+     }
++    // Paper start
++    @Override
++    public void damage(double amount, io.papermc.paper.world.damagesource.DamageSource damageSource) {
++        entity.hurt(io.papermc.paper.world.damagesource.DamageSourceAdapter.adapt(damageSource), (float) amount);
++    }
++    // Paper end
+ 
+     @Override
+     public Location getEyeLocation() {
+diff --git a/src/main/java/org/bukkit/craftbukkit/event/CraftEventFactory.java b/src/main/java/org/bukkit/craftbukkit/event/CraftEventFactory.java
+index 1d8ec0f85ec42f2dcd9405df83b526ae1c59de6f..e7ef256ecd3ae07531401b05f6bcaed4bdb9a748 100644
+--- a/src/main/java/org/bukkit/craftbukkit/event/CraftEventFactory.java
++++ b/src/main/java/org/bukkit/craftbukkit/event/CraftEventFactory.java
+@@ -969,16 +969,16 @@ public class CraftEventFactory {
+             CraftEventFactory.entityDamage = null;
+             EntityDamageEvent event;
+             if (damager == null) {
+-                event = new EntityDamageByBlockEvent(null, entity.getBukkitEntity(), DamageCause.BLOCK_EXPLOSION, modifiers, modifierFunctions);
++                event = new EntityDamageByBlockEvent(null, entity.getBukkitEntity(), DamageCause.BLOCK_EXPLOSION, modifiers, modifierFunctions, io.papermc.paper.world.damagesource.DamageSourceAdapter.adapt(source)); // Paper
+             } else if (entity instanceof EnderDragon && /*PAIL FIXME ((EntityEnderDragon) entity).target == damager*/ false) {
+-                event = new EntityDamageEvent(entity.getBukkitEntity(), DamageCause.ENTITY_EXPLOSION, modifiers, modifierFunctions);
++                event = new EntityDamageEvent(entity.getBukkitEntity(), DamageCause.ENTITY_EXPLOSION, modifiers, modifierFunctions, io.papermc.paper.world.damagesource.DamageSourceAdapter.adapt(source)); // Paper
+             } else {
+                 if (damager instanceof org.bukkit.entity.TNTPrimed) {
+                     damageCause = DamageCause.BLOCK_EXPLOSION;
+                 } else {
+                     damageCause = DamageCause.ENTITY_EXPLOSION;
+                 }
+-                event = new EntityDamageByEntityEvent(damager.getBukkitEntity(), entity.getBukkitEntity(), damageCause, modifiers, modifierFunctions, source.isCritical()); // Paper - add critical damage API
++                event = new EntityDamageByEntityEvent(damager.getBukkitEntity(), entity.getBukkitEntity(), damageCause, modifiers, modifierFunctions, source.isCritical(), io.papermc.paper.world.damagesource.DamageSourceAdapter.adapt(source)); // Paper - add critical damage API & source api
+             }
+             event.setCancelled(cancelled);
+ 
+@@ -1007,9 +1007,9 @@ public class CraftEventFactory {
+                 cause = DamageCause.SONIC_BOOM;
+             }
+ 
+-            return CraftEventFactory.callEntityDamageEvent(damager, entity, cause, modifiers, modifierFunctions, cancelled, source.isCritical()); // Paper - add critical damage API
++            return CraftEventFactory.callEntityDamageEvent(damager, entity, cause, modifiers, modifierFunctions, cancelled, source.isCritical(), io.papermc.paper.world.damagesource.DamageSourceAdapter.adapt(source)); // Paper - add critical damage API & source api
+         } else if (source == DamageSource.OUT_OF_WORLD) {
+-            EntityDamageEvent event = new EntityDamageByBlockEvent(null, entity.getBukkitEntity(), DamageCause.VOID, modifiers, modifierFunctions);
++            EntityDamageEvent event = new EntityDamageByBlockEvent(null, entity.getBukkitEntity(), DamageCause.VOID, modifiers, modifierFunctions, io.papermc.paper.world.damagesource.DamageSourceAdapter.adapt(source)); // Paper - source api
+             event.setCancelled(cancelled);
+             CraftEventFactory.callEvent(event);
+             if (!event.isCancelled()) {
+@@ -1019,7 +1019,7 @@ public class CraftEventFactory {
+             }
+             return event;
+         } else if (source == DamageSource.LAVA) {
+-            EntityDamageEvent event = (new EntityDamageByBlockEvent(CraftEventFactory.blockDamage, entity.getBukkitEntity(), DamageCause.LAVA, modifiers, modifierFunctions));
++            EntityDamageEvent event = (new EntityDamageByBlockEvent(CraftEventFactory.blockDamage, entity.getBukkitEntity(), DamageCause.LAVA, modifiers, modifierFunctions, io.papermc.paper.world.damagesource.DamageSourceAdapter.adapt(source))); // Paper - source api
+             event.setCancelled(cancelled);
+ 
+             Block damager = CraftEventFactory.blockDamage;
+@@ -1047,7 +1047,7 @@ public class CraftEventFactory {
+             } else {
+                 throw new IllegalStateException(String.format("Unhandled damage of %s by %s from %s", entity, damager, source.msgId));
+             }
+-            EntityDamageEvent event = new EntityDamageByBlockEvent(damager, entity.getBukkitEntity(), cause, modifiers, modifierFunctions);
++            EntityDamageEvent event = new EntityDamageByBlockEvent(damager, entity.getBukkitEntity(), cause, modifiers, modifierFunctions, io.papermc.paper.world.damagesource.DamageSourceAdapter.adapt(source)); // Paper - source api
+             event.setCancelled(cancelled);
+ 
+             CraftEventFactory.blockDamage = null; // SPIGOT-6639: Clear blockDamage to allow other entity damage during event call
+@@ -1077,7 +1077,7 @@ public class CraftEventFactory {
+             } else {
+                 throw new IllegalStateException(String.format("Unhandled damage of %s by %s from %s", entity, damager.getHandle(), source.msgId));
+             }
+-            EntityDamageEvent event = new EntityDamageByEntityEvent(damager, entity.getBukkitEntity(), cause, modifiers, modifierFunctions, source.isCritical()); // Paper - add critical damage API
++            EntityDamageEvent event = new EntityDamageByEntityEvent(damager, entity.getBukkitEntity(), cause, modifiers, modifierFunctions, source.isCritical(), io.papermc.paper.world.damagesource.DamageSourceAdapter.adapt(source)); // Paper - add critical damage API & source API
+             event.setCancelled(cancelled);
+             CraftEventFactory.callEvent(event);
+             if (!event.isCancelled()) {
+@@ -1122,7 +1122,7 @@ public class CraftEventFactory {
+         }
+ 
+         if (cause != null) {
+-            return CraftEventFactory.callEntityDamageEvent(null, entity, cause, modifiers, modifierFunctions, cancelled, source.isCritical()); // Paper - add critical damage API
++            return CraftEventFactory.callEntityDamageEvent(null, entity, cause, modifiers, modifierFunctions, cancelled, source.isCritical(), io.papermc.paper.world.damagesource.DamageSourceAdapter.adapt(source)); // Paper - add critical damage api & source api
+         }
+ 
+         throw new IllegalStateException(String.format("Unhandled damage of %s from %s", entity, source.msgId));
+@@ -1139,13 +1139,18 @@ public class CraftEventFactory {
+         return CraftEventFactory.callEntityDamageEvent(damager, damagee, cause, modifiers, modifierFunctions, false, false);
+     }
+ 
++    @Deprecated
+     private static EntityDamageEvent callEntityDamageEvent(Entity damager, Entity damagee, DamageCause cause, Map<DamageModifier, Double> modifiers, Map<DamageModifier, Function<? super Double, Double>> modifierFunctions, boolean cancelled, boolean critical) {
++        return CraftEventFactory.callEntityDamageEvent(damager, damagee, cause, modifiers, modifierFunctions, cancelled, critical, io.papermc.paper.world.damagesource.StaticDamageSource.GENERIC);
++    }
++
++    private static EntityDamageEvent callEntityDamageEvent(Entity damager, Entity damagee, DamageCause cause, Map<DamageModifier, Double> modifiers, Map<DamageModifier, Function<? super Double, Double>> modifierFunctions, boolean cancelled, boolean critical, io.papermc.paper.world.damagesource.DamageSource source) {
+         // Paper end
+         EntityDamageEvent event;
+         if (damager != null) {
+-            event = new EntityDamageByEntityEvent(damager.getBukkitEntity(), damagee.getBukkitEntity(), cause, modifiers, modifierFunctions, critical); // Paper - add critical damage API
++            event = new EntityDamageByEntityEvent(damager.getBukkitEntity(), damagee.getBukkitEntity(), cause, modifiers, modifierFunctions, critical, source); // Paper - add critical damage API & source API
+         } else {
+-            event = new EntityDamageEvent(damagee.getBukkitEntity(), cause, modifiers, modifierFunctions);
++            event = new EntityDamageEvent(damagee.getBukkitEntity(), cause, modifiers, modifierFunctions, source); // Paper - source API
+         }
+         event.setCancelled(cancelled);
+         CraftEventFactory.callEvent(event);
+diff --git a/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java b/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java
+index 7c1e510a0ad4b69c1fedc3367a8216046efb228e..101e9cd8774c20fa1b9d4cc0843eb4c317dbf331 100644
+--- a/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java
++++ b/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java
+@@ -62,6 +62,7 @@ import org.bukkit.inventory.ItemStack;
+ import org.bukkit.material.MaterialData;
+ import org.bukkit.plugin.InvalidPluginException;
+ import org.bukkit.plugin.PluginDescriptionFile;
++import org.jetbrains.annotations.NotNull;
+ 
+ @SuppressWarnings("deprecation")
+ public final class CraftMagicNumbers implements UnsafeValues {
+@@ -604,6 +605,12 @@ public final class CraftMagicNumbers implements UnsafeValues {
+         Preconditions.checkArgument(material.isBlock(), material + " is not a block");
+         return getBlock(material).hasCollision;
+     }
++
++    @NotNull
++    @Override
++    public io.papermc.paper.world.damagesource.DamageSource getDamageSource(String key) {
++        return io.papermc.paper.world.damagesource.DamageSourceAdapter.adapt(key);
++    }
+     // Paper end
+ 
+     /**

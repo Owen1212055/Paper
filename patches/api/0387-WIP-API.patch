@@ -1,0 +1,773 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Owen1212055 <23108066+Owen1212055@users.noreply.github.com>
+Date: Fri, 17 Jun 2022 21:02:39 -0400
+Subject: [PATCH] WIP API
+
+
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/DamageSource.java b/src/main/java/io/papermc/paper/world/damagesource/DamageSource.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..8e1cb3da696e85327d1a41b00d551a8db31d14c1
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/DamageSource.java
+@@ -0,0 +1,54 @@
++package io.papermc.paper.world.damagesource;
++
++import io.papermc.paper.world.damagesource.builders.DamageSourceBuilder;
++import io.papermc.paper.world.damagesource.builders.EntityDamageSourceBuilder;
++import io.papermc.paper.world.damagesource.builders.IndirectEntityDamageSourceBuilder;
++import net.kyori.adventure.text.Component;
++import org.bukkit.entity.Entity;
++import org.bukkit.entity.LivingEntity;
++
++public interface DamageSource {
++
++    static DamageSourceBuilder of(String name) {
++        return new DamageSourceBuilder(name);
++    }
++
++    static EntityDamageSourceBuilder entitySource(String name, Entity source) {
++        return new EntityDamageSourceBuilder(name, source);
++    }
++
++    static IndirectEntityDamageSourceBuilder indirectEntitySource(String name, Entity source, Entity directSource) {
++        return new IndirectEntityDamageSourceBuilder(name, source, directSource);
++    }
++
++    String getName();
++
++    boolean damageHelmet();
++
++    float getFoodExhaustion();
++
++    boolean bypassArmor();
++
++    boolean bypassInvulnerability();
++
++    boolean bypassMagic();
++
++    boolean bypassEnchantments();
++
++    boolean causeAggro();
++
++    boolean scalesWithDifficulty();
++
++    boolean isProjectile();
++
++    boolean isExplosion();
++
++    boolean isFire();
++
++    boolean isMagic();
++
++    boolean isFall();
++
++    Component deathMessage(LivingEntity entity);
++
++}
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/EntityDamageSource.java b/src/main/java/io/papermc/paper/world/damagesource/EntityDamageSource.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..893313cd8932413b714e2a7584115520ada3fa28
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/EntityDamageSource.java
+@@ -0,0 +1,15 @@
++package io.papermc.paper.world.damagesource;
++
++import org.bukkit.entity.Entity;
++import org.bukkit.util.Vector;
++
++public interface EntityDamageSource extends DamageSource {
++
++
++    Entity getSource();
++
++    Vector getPosition();
++
++    boolean isThorns();
++
++}
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/IndirectEntityDamageSource.java b/src/main/java/io/papermc/paper/world/damagesource/IndirectEntityDamageSource.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9bdab6baa7623cbc3bc5e3c87aead6cba112c22b
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/IndirectEntityDamageSource.java
+@@ -0,0 +1,11 @@
++package io.papermc.paper.world.damagesource;
++
++import org.bukkit.entity.Entity;
++import org.jetbrains.annotations.Nullable;
++
++public interface IndirectEntityDamageSource extends EntityDamageSource {
++
++    @Nullable
++    Entity getDirectCause();
++
++}
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/StaticDamageSource.java b/src/main/java/io/papermc/paper/world/damagesource/StaticDamageSource.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9ccc6eeda33039add20d29493cb96552220082a4
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/StaticDamageSource.java
+@@ -0,0 +1,40 @@
++package io.papermc.paper.world.damagesource;
++
++import org.bukkit.Bukkit;
++
++/**
++ * Represents a simple damage source which
++ * doesn't change.
++ */
++public final class StaticDamageSource {
++
++    public static final DamageSource IN_FIRE = of("inFire");
++    public static final DamageSource LIGHTNING_BOLT = of("lightningBolt");
++    public static final DamageSource ON_FIRE = of("onFire");
++    public static final DamageSource LAVA = of("lava");
++    public static final DamageSource HOT_FLOOR = of("hotFloor");
++    public static final DamageSource IN_WALL = of("inWall");
++    public static final DamageSource CRAMMING = of("cramming");
++    public static final DamageSource DROWN = of("drown");
++    public static final DamageSource STARVE = of("starve");
++    public static final DamageSource CACTUS = of("cactus");
++    public static final DamageSource FALL = of("fall");
++    public static final DamageSource FLY_INTO_WALL = of("flyIntoWall");
++    public static final DamageSource OUT_OF_WORLD = of("outOfWorld");
++    public static final DamageSource GENERIC = of("generic");
++    public static final DamageSource MAGIC = of("magic");
++    public static final DamageSource WITHER = of("wither");
++    public static final DamageSource ANVIL = of("anvil");
++    public static final DamageSource FALLING_BLOCK = of("fallingBlock");
++    public static final DamageSource DRAGON_BREATH = of("dragonBreath");
++    public static final DamageSource DRY_OUT = of("dryout");
++    public static final DamageSource SWEET_BERRY_BUSH = of("sweetBerryBush");
++    public static final DamageSource FREEZE = of("freeze");
++    public static final DamageSource FALLING_STALACTITE = of("fallingStalactite");
++    public static final DamageSource STALAGMITE = of("stalagmite");
++
++
++    private static DamageSource of(String key) {
++        return Bukkit.getUnsafe().getDamageSource(key);
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/builders/AbstractDamageSourceBuilder.java b/src/main/java/io/papermc/paper/world/damagesource/builders/AbstractDamageSourceBuilder.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..b8cc3775f00ded384a7a44d939fca7e3d9975d5b
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/builders/AbstractDamageSourceBuilder.java
+@@ -0,0 +1,106 @@
++package io.papermc.paper.world.damagesource.builders;
++
++import net.kyori.adventure.text.Component;
++import org.bukkit.entity.LivingEntity;
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
++
++import java.util.function.Function;
++
++@SuppressWarnings("unchecked")
++public abstract class AbstractDamageSourceBuilder<T, B> {
++
++    @NotNull
++    protected String name;
++    protected boolean damageHelmet;
++    protected float foodExhaustion;
++    protected boolean bypassArmor;
++    protected boolean bypassInvul;
++    protected boolean bypassMagic;
++    protected boolean bypassEnchants;
++    protected boolean causeAggro;
++    protected boolean scalesWithDifficulty;
++    protected boolean isProjectile;
++    protected boolean isExplosion;
++    protected boolean isFire;
++    protected boolean isMagic;
++    protected boolean isFall;
++    @Nullable
++    protected Function<LivingEntity, Component> deathMessageProvider;
++
++    public AbstractDamageSourceBuilder(@NotNull String name) {
++        this.name = name;
++    }
++
++    public T setDamageHelmet(boolean damageHelmet) {
++        this.damageHelmet = damageHelmet;
++        return (T) this;
++    }
++
++    public T setFoodExhaustion(float foodExhaustion) {
++        this.foodExhaustion = foodExhaustion;
++        return (T) this;
++    }
++
++    public T setBypassArmor(boolean bypassArmor) {
++        this.bypassArmor = bypassArmor;
++        return (T) this;
++    }
++
++    public T setBypassInvul(boolean bypassInvul) {
++        this.bypassInvul = bypassInvul;
++        return (T) this;
++    }
++
++    public T setBypassMagic(boolean bypassMagic) {
++        this.bypassMagic = bypassMagic;
++        return (T) this;
++    }
++
++    public T setBypassEnchants(boolean bypassEnchants) {
++        this.bypassEnchants = bypassEnchants;
++        return (T) this;
++    }
++
++    public T setCauseAggro(boolean causeAggro) {
++        this.causeAggro = causeAggro;
++        return (T) this;
++    }
++
++    public T setScalesWithDifficulty(boolean scalesWithDifficulty) {
++        this.scalesWithDifficulty = scalesWithDifficulty;
++        return (T) this;
++    }
++
++    public T setIsProjectile(boolean isProjectile) {
++        this.isProjectile = isProjectile;
++        return (T) this;
++    }
++
++    public T setIsExplosion(boolean isExplosion) {
++        this.isExplosion = isExplosion;
++        return (T) this;
++    }
++
++    public T setIsFire(boolean isFire) {
++        this.isFire = isFire;
++        return (T) this;
++    }
++
++    public T setIsMagic(boolean isMagic) {
++        this.isMagic = isMagic;
++        return (T) this;
++    }
++
++    public T setIsFall(boolean isFall) {
++        this.isFall = isFall;
++        return (T) this;
++    }
++
++    public T setDeathMessageProvider(@Nullable Function<LivingEntity, Component> deathMessageProvider) {
++        this.deathMessageProvider = deathMessageProvider;
++        return (T) this;
++    }
++
++    public abstract B build();
++}
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/builders/AbstractEntityDamageSourceBuilder.java b/src/main/java/io/papermc/paper/world/damagesource/builders/AbstractEntityDamageSourceBuilder.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..a815e8264d93c15c30f19f8cda8431a012d31108
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/builders/AbstractEntityDamageSourceBuilder.java
+@@ -0,0 +1,23 @@
++package io.papermc.paper.world.damagesource.builders;
++
++import org.bukkit.entity.Entity;
++
++@SuppressWarnings("unchecked")
++public abstract class AbstractEntityDamageSourceBuilder<T, B> extends AbstractDamageSourceBuilder<T, B> {
++
++
++    protected final Entity source;
++
++    protected boolean isThorns;
++
++    protected AbstractEntityDamageSourceBuilder(String name, Entity source) {
++        super(name);
++        this.source = source;
++    }
++
++    public T setIsThorns(boolean isThorns) {
++        this.isThorns = isThorns;
++        return (T) this;
++    }
++
++}
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/builders/DamageSourceBuilder.java b/src/main/java/io/papermc/paper/world/damagesource/builders/DamageSourceBuilder.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f2adfc4b26b82de91b628783827fc0e9ab30049
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/builders/DamageSourceBuilder.java
+@@ -0,0 +1,94 @@
++package io.papermc.paper.world.damagesource.builders;
++
++import io.papermc.paper.world.damagesource.DamageSource;
++import net.kyori.adventure.text.Component;
++import org.bukkit.entity.LivingEntity;
++import org.jetbrains.annotations.NotNull;
++
++public class DamageSourceBuilder extends AbstractDamageSourceBuilder<DamageSourceBuilder, DamageSource> {
++
++    public DamageSourceBuilder(@NotNull String name) {
++        super(name);
++    }
++
++    @Override
++    public DamageSource build() {
++        return new DamageSource() {
++
++            @Override
++            public String getName() {
++                return name;
++            }
++
++            @Override
++            public boolean damageHelmet() {
++                return damageHelmet;
++            }
++
++            @Override
++            public float getFoodExhaustion() {
++                return foodExhaustion;
++            }
++
++            @Override
++            public boolean bypassArmor() {
++                return bypassArmor;
++            }
++
++            @Override
++            public boolean bypassInvulnerability() {
++                return bypassInvul;
++            }
++
++            @Override
++            public boolean bypassMagic() {
++                return bypassMagic;
++            }
++
++            @Override
++            public boolean bypassEnchantments() {
++                return bypassEnchants;
++            }
++
++            @Override
++            public boolean causeAggro() {
++                return causeAggro;
++            }
++
++            @Override
++            public boolean scalesWithDifficulty() {
++                return scalesWithDifficulty;
++            }
++
++            @Override
++            public boolean isProjectile() {
++                return isProjectile;
++            }
++
++            @Override
++            public boolean isExplosion() {
++                return isExplosion;
++            }
++
++            @Override
++            public boolean isFire() {
++                return isFire;
++            }
++
++            @Override
++            public boolean isMagic() {
++                return isMagic;
++            }
++
++            @Override
++            public boolean isFall() {
++                return isFall;
++            }
++
++            @Override
++            public Component deathMessage(LivingEntity entity) {
++                return deathMessageProvider.apply(entity);
++            }
++        };
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/builders/EntityDamageSourceBuilder.java b/src/main/java/io/papermc/paper/world/damagesource/builders/EntityDamageSourceBuilder.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..e59a458424cd6124babf1b7ef81a564868aa69ca
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/builders/EntityDamageSourceBuilder.java
+@@ -0,0 +1,109 @@
++package io.papermc.paper.world.damagesource.builders;
++
++import io.papermc.paper.world.damagesource.EntityDamageSource;
++import net.kyori.adventure.text.Component;
++import org.bukkit.entity.Entity;
++import org.bukkit.entity.LivingEntity;
++import org.bukkit.util.Vector;
++
++public class EntityDamageSourceBuilder extends AbstractEntityDamageSourceBuilder<EntityDamageSourceBuilder, EntityDamageSource> {
++
++    public EntityDamageSourceBuilder(String name, Entity source) {
++        super(name, source);
++    }
++
++    @Override
++    public EntityDamageSource build() {
++        return new EntityDamageSource() {
++            @Override
++            public Entity getSource() {
++                return source;
++            }
++
++            @Override
++            public Vector getPosition() {
++                return source.getLocation().toVector();
++            }
++
++            @Override
++            public boolean isThorns() {
++                return isThorns;
++            }
++
++            @Override
++            public String getName() {
++                return name;
++            }
++
++            @Override
++            public boolean damageHelmet() {
++                return damageHelmet;
++            }
++
++            @Override
++            public float getFoodExhaustion() {
++                return foodExhaustion;
++            }
++
++            @Override
++            public boolean bypassArmor() {
++                return bypassArmor;
++            }
++
++            @Override
++            public boolean bypassInvulnerability() {
++                return bypassInvul;
++            }
++
++            @Override
++            public boolean bypassMagic() {
++                return bypassMagic;
++            }
++
++            @Override
++            public boolean bypassEnchantments() {
++                return bypassEnchants;
++            }
++
++            @Override
++            public boolean causeAggro() {
++                return causeAggro;
++            }
++
++            @Override
++            public boolean scalesWithDifficulty() {
++                return scalesWithDifficulty;
++            }
++
++            @Override
++            public boolean isProjectile() {
++                return isProjectile;
++            }
++
++            @Override
++            public boolean isExplosion() {
++                return isExplosion;
++            }
++
++            @Override
++            public boolean isFire() {
++                return isFire;
++            }
++
++            @Override
++            public boolean isMagic() {
++                return isMagic;
++            }
++
++            @Override
++            public boolean isFall() {
++                return isFall;
++            }
++
++            @Override
++            public Component deathMessage(LivingEntity entity) {
++                return deathMessageProvider.apply(entity);
++            }
++        };
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/world/damagesource/builders/IndirectEntityDamageSourceBuilder.java b/src/main/java/io/papermc/paper/world/damagesource/builders/IndirectEntityDamageSourceBuilder.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..10790baab54eeb4966e1e4afef9bea344603a355
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/world/damagesource/builders/IndirectEntityDamageSourceBuilder.java
+@@ -0,0 +1,120 @@
++package io.papermc.paper.world.damagesource.builders;
++
++import io.papermc.paper.world.damagesource.IndirectEntityDamageSource;
++import net.kyori.adventure.text.Component;
++import org.bukkit.entity.Entity;
++import org.bukkit.entity.LivingEntity;
++import org.bukkit.util.Vector;
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
++
++public class IndirectEntityDamageSourceBuilder extends AbstractEntityDamageSourceBuilder<IndirectEntityDamageSourceBuilder, IndirectEntityDamageSource> {
++
++    @Nullable
++    protected Entity directSource;
++
++    public IndirectEntityDamageSourceBuilder(@NotNull String name, @Nullable Entity source, @Nullable Entity directSource) {
++        super(name, source);
++        this.directSource = directSource;
++    }
++
++    @Override
++    public IndirectEntityDamageSource build() {
++        return new IndirectEntityDamageSource() {
++            @Override
++            public @Nullable Entity getDirectCause() {
++                return directSource;
++            }
++
++            @Override
++            public Entity getSource() {
++                return source;
++            }
++
++            @Override
++            public Vector getPosition() {
++                return source.getLocation().toVector();
++            }
++
++            @Override
++            public boolean isThorns() {
++                return isThorns;
++            }
++
++            @Override
++            public String getName() {
++                return name;
++            }
++
++            @Override
++            public boolean damageHelmet() {
++                return damageHelmet;
++            }
++
++            @Override
++            public float getFoodExhaustion() {
++                return foodExhaustion;
++            }
++
++            @Override
++            public boolean bypassArmor() {
++                return bypassArmor;
++            }
++
++            @Override
++            public boolean bypassInvulnerability() {
++                return bypassInvul;
++            }
++
++            @Override
++            public boolean bypassMagic() {
++                return bypassMagic;
++            }
++
++            @Override
++            public boolean bypassEnchantments() {
++                return bypassEnchants;
++            }
++
++            @Override
++            public boolean causeAggro() {
++                return causeAggro;
++            }
++
++            @Override
++            public boolean scalesWithDifficulty() {
++                return scalesWithDifficulty;
++            }
++
++            @Override
++            public boolean isProjectile() {
++                return isProjectile;
++            }
++
++            @Override
++            public boolean isExplosion() {
++                return isExplosion;
++            }
++
++            @Override
++            public boolean isFire() {
++                return isFire;
++            }
++
++            @Override
++            public boolean isMagic() {
++                return isMagic;
++            }
++
++            @Override
++            public boolean isFall() {
++                return isFall;
++            }
++
++            @Override
++            public Component deathMessage(LivingEntity entity) {
++                return deathMessageProvider.apply(entity);
++            }
++        };
++    }
++}
+diff --git a/src/main/java/org/bukkit/Server.java b/src/main/java/org/bukkit/Server.java
+index 30b49aed62fa67276e8964922ea3f84458d854bb..01e96f256b5579950fa34079897276d87dee80bb 100644
+--- a/src/main/java/org/bukkit/Server.java
++++ b/src/main/java/org/bukkit/Server.java
+@@ -2064,5 +2064,4 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
+      * @return the potion brewer
+      */
+     @NotNull org.bukkit.potion.PotionBrewer getPotionBrewer();
+-    // Paper end
+ }
+diff --git a/src/main/java/org/bukkit/UnsafeValues.java b/src/main/java/org/bukkit/UnsafeValues.java
+index 4fcafddf3792b66c618f91e04d102f374de565a8..e7ab0502ec09033c74ca60a7ae1a6ded8898adec 100644
+--- a/src/main/java/org/bukkit/UnsafeValues.java
++++ b/src/main/java/org/bukkit/UnsafeValues.java
+@@ -242,5 +242,7 @@ public interface UnsafeValues {
+      * @throws IllegalArgumentException if {@link Material#isBlock()} is false
+      */
+     boolean isCollidable(@org.jetbrains.annotations.NotNull Material material);
++
++    @org.jetbrains.annotations.NotNull io.papermc.paper.world.damagesource.DamageSource getDamageSource(String key);
+     // Paper end
+ }
+diff --git a/src/main/java/org/bukkit/entity/Damageable.java b/src/main/java/org/bukkit/entity/Damageable.java
+index fc4d3bcd9b16097086fef7975274d825b65adb10..7eb8115d451c2285af121065d7f923d2eb0eb205 100644
+--- a/src/main/java/org/bukkit/entity/Damageable.java
++++ b/src/main/java/org/bukkit/entity/Damageable.java
+@@ -23,6 +23,10 @@ public interface Damageable extends Entity {
+      */
+     void damage(double amount, @Nullable Entity source);
+ 
++    // Paper start
++    void damage(double amount, io.papermc.paper.world.damagesource.DamageSource damageSource);
++    // Paper end
++
+     /**
+      * Gets the entity's health from 0 to {@link #getMaxHealth()}, where 0 is dead.
+      *
+diff --git a/src/main/java/org/bukkit/event/entity/EntityDamageByBlockEvent.java b/src/main/java/org/bukkit/event/entity/EntityDamageByBlockEvent.java
+index 461727dc7f06efb3550fc370e0db5bd04ba89711..0b1e088c7f94949c36123ab3a18a2fbcb69ad0e7 100644
+--- a/src/main/java/org/bukkit/event/entity/EntityDamageByBlockEvent.java
++++ b/src/main/java/org/bukkit/event/entity/EntityDamageByBlockEvent.java
+@@ -13,13 +13,28 @@ import org.jetbrains.annotations.Nullable;
+ public class EntityDamageByBlockEvent extends EntityDamageEvent {
+     private final Block damager;
+ 
++    // Paper start
++    @java.lang.Deprecated
+     public EntityDamageByBlockEvent(@Nullable final Block damager, @NotNull final Entity damagee, @NotNull final DamageCause cause, final double damage) {
+-        super(damagee, cause, damage);
++        this(damager, damagee, cause, damage, io.papermc.paper.world.damagesource.StaticDamageSource.GENERIC); // TODO?
++    }
++
++    public EntityDamageByBlockEvent(@Nullable final Block damager, @NotNull final Entity damagee, @NotNull final DamageCause cause, final double damage, io.papermc.paper.world.damagesource.DamageSource source) {
++        super(damagee, cause, damage, source);
++    // Paper end
+         this.damager = damager;
+     }
+ 
++    // Paper start
++    @java.lang.Deprecated
+     public EntityDamageByBlockEvent(@Nullable final Block damager, @NotNull final Entity damagee, @NotNull final DamageCause cause, @NotNull final Map<DamageModifier, Double> modifiers, @NotNull final Map<DamageModifier, ? extends Function<? super Double, Double>> modifierFunctions) {
+-        super(damagee, cause, modifiers, modifierFunctions);
++        this(damager, damagee, cause, modifiers, modifierFunctions, io.papermc.paper.world.damagesource.StaticDamageSource.GENERIC); // TODO?
++    }
++
++    @java.lang.Deprecated // Premarked as deprecated as we prolly don't want to keep this in the future (damagemodifier api is yuck)
++    public EntityDamageByBlockEvent(@Nullable final Block damager, @NotNull final Entity damagee, @NotNull final DamageCause cause, @NotNull final Map<DamageModifier, Double> modifiers, @NotNull final Map<DamageModifier, ? extends Function<? super Double, Double>> modifierFunctions, io.papermc.paper.world.damagesource.DamageSource source) {
++        super(damagee, cause, modifiers, modifierFunctions, source);
++        // Paper end
+         this.damager = damager;
+     }
+ 
+diff --git a/src/main/java/org/bukkit/event/entity/EntityDamageByEntityEvent.java b/src/main/java/org/bukkit/event/entity/EntityDamageByEntityEvent.java
+index 7ce8f1a26c1b33dd0eb6e6435952fd73abf49879..541dacf2244991be7a6338f27ed327c1ec711a3f 100644
+--- a/src/main/java/org/bukkit/event/entity/EntityDamageByEntityEvent.java
++++ b/src/main/java/org/bukkit/event/entity/EntityDamageByEntityEvent.java
+@@ -25,9 +25,15 @@ public class EntityDamageByEntityEvent extends EntityDamageEvent {
+     }
+ 
+     private final boolean critical;
++    @Deprecated
+     public EntityDamageByEntityEvent(@NotNull final Entity damager, @NotNull final Entity damagee, @NotNull final DamageCause cause, @NotNull final Map<DamageModifier, Double> modifiers, @NotNull final Map<DamageModifier, ? extends Function<? super Double, Double>> modifierFunctions, boolean critical) {
++        this(damager, damagee, cause, modifiers, modifierFunctions, critical, io.papermc.paper.world.damagesource.StaticDamageSource.GENERIC);
++    }
++
++    public EntityDamageByEntityEvent(@NotNull final Entity damager, @NotNull final Entity damagee, @NotNull final DamageCause cause, @NotNull final Map<DamageModifier, Double> modifiers,
++                                     @NotNull final Map<DamageModifier, ? extends Function<? super Double, Double>> modifierFunctions, boolean critical, io.papermc.paper.world.damagesource.DamageSource damageSource) {
++        super(damagee, cause, modifiers, modifierFunctions, damageSource);
+         // Paper end
+-        super(damagee, cause, modifiers, modifierFunctions);
+         this.damager = damager;
+         // Paper start - add critical damage API
+         this.critical = critical;
+diff --git a/src/main/java/org/bukkit/event/entity/EntityDamageEvent.java b/src/main/java/org/bukkit/event/entity/EntityDamageEvent.java
+index 6241f31e7326954b2e704da46bf0115adbcf8671..98cd9a22a5fccd41553409692f061f93a6458a63 100644
+--- a/src/main/java/org/bukkit/event/entity/EntityDamageEvent.java
++++ b/src/main/java/org/bukkit/event/entity/EntityDamageEvent.java
+@@ -26,13 +26,28 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
+     private final Map<DamageModifier, Double> originals;
+     private boolean cancelled;
+     private final DamageCause cause;
++    private final io.papermc.paper.world.damagesource.DamageSource damageSource; // Paper
+ 
++    @Deprecated // Paper
+     public EntityDamageEvent(@NotNull final Entity damagee, @NotNull final DamageCause cause, final double damage) {
+-        this(damagee, cause, new EnumMap<DamageModifier, Double>(ImmutableMap.of(DamageModifier.BASE, damage)), new EnumMap<DamageModifier, Function<? super Double, Double>>(ImmutableMap.of(DamageModifier.BASE, ZERO)));
++    // Paper start
++        this(damagee, cause, damage, io.papermc.paper.world.damagesource.StaticDamageSource.GENERIC); // TODO?
+     }
++    public EntityDamageEvent(@NotNull final Entity damagee, @NotNull final DamageCause cause, final double damage, io.papermc.paper.world.damagesource.DamageSource damageSource) {
++        this(damagee, cause, new EnumMap<DamageModifier, Double>(ImmutableMap.of(DamageModifier.BASE, damage)), new EnumMap<DamageModifier, Function<? super Double, Double>>(ImmutableMap.of(DamageModifier.BASE, ZERO)), damageSource);
++    }
++    // Paper end
+ 
++    // Paper start
++    @Deprecated
+     public EntityDamageEvent(@NotNull final Entity damagee, @NotNull final DamageCause cause, @NotNull final Map<DamageModifier, Double> modifiers, @NotNull final Map<DamageModifier, ? extends Function<? super Double, Double>> modifierFunctions) {
++        this(damagee, cause, modifiers, modifierFunctions, io.papermc.paper.world.damagesource.StaticDamageSource.GENERIC); // TODO?
++    }
++
++    public EntityDamageEvent(@NotNull final Entity damagee, @NotNull final DamageCause cause, @NotNull final Map<DamageModifier, Double> modifiers, @NotNull final Map<DamageModifier, ? extends Function<? super Double, Double>> modifierFunctions, io.papermc.paper.world.damagesource.DamageSource damageSource) { // Paper
+         super(damagee);
++        this.damageSource = damageSource;
++    // Paper end
+         Preconditions.checkArgument(modifiers.containsKey(DamageModifier.BASE), "BASE DamageModifier missing");
+         Preconditions.checkArgument(!modifiers.containsKey(null), "Cannot have null DamageModifier");
+         Preconditions.checkArgument(modifiers.values().stream().allMatch(Objects::nonNull), "Cannot have null modifier values");
+@@ -192,6 +207,13 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
+         return cause;
+     }
+ 
++    // Paper start
++    @NotNull
++    public io.papermc.paper.world.damagesource.DamageSource getDamageSource() {
++        return this.damageSource;
++    }
++    // Paper end
++
+     @NotNull
+     @Override
+     public HandlerList getHandlers() {
