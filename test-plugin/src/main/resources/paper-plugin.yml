@@ -5,3 +5,4 @@ description: Paper Test Plugin
 author: PaperMC
 api-version: ${apiversion}
 load: STARTUP
+initializer: io.papermc.paper.testplugin.PreTestPlugin
