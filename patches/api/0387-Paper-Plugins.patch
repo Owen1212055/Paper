@@ -57,10 +57,10 @@ index 0000000000000000000000000000000000000000..8c43fb9c04cf92e04f4ca6a1a02de758
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..c5e89af7adb4d234777e98eb7fcd6d83fa2fbb9b
+index 0000000000000000000000000000000000000000..35fc4d4f7cbf90e90115658c21ac0faf7e9c86f2
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,29 @@
 +package io.papermc.paper.plugin.provider;
 +
 +import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
@@ -88,7 +88,6 @@ index 0000000000000000000000000000000000000000..c5e89af7adb4d234777e98eb7fcd6d83
 +    PluginConfiguration getConfiguration();
 +
 +    Logger getLogger();
-+
 +
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/BukkitConfigurationWrapper.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/BukkitConfigurationWrapper.java
@@ -628,6 +627,25 @@ index 0000000000000000000000000000000000000000..672d06cb5e3c4cfd584d0c868b24891a
 +        return this.spigotClassLoaders.contains(pluginLoader);
 +    }
 +}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/ProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/ProviderStorage.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b2ea4e6d00039770380323242199f8d74392b01
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/ProviderStorage.java
+@@ -0,0 +1,13 @@
++package io.papermc.paper.plugin.provider.service.storage;
++
++import io.papermc.paper.plugin.provider.PluginProvider;
++import org.jetbrains.annotations.ApiStatus;
++
++public interface ProviderStorage<T> {
++
++    void register(PluginProvider<T> provider);
++
++    @ApiStatus.Internal
++    Iterable<PluginProvider<T>> getRegisteredProviders();
++
++}
 diff --git a/src/main/java/io/papermc/paper/registry/RegistryAccess.java b/src/main/java/io/papermc/paper/registry/RegistryAccess.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..f26486d188fa8f120b5322ac568c422a881f584f
@@ -642,6 +660,19 @@ index 0000000000000000000000000000000000000000..f26486d188fa8f120b5322ac568c422a
 +        return new RegistryAccess();
 +    }
 +}
+diff --git a/src/main/java/org/bukkit/command/SimpleCommandMap.java b/src/main/java/org/bukkit/command/SimpleCommandMap.java
+index b8623575b1c1b565560c2dd6438190716845a652..785952d60df7c0ab7b247ba81d1970b5a90e5340 100644
+--- a/src/main/java/org/bukkit/command/SimpleCommandMap.java
++++ b/src/main/java/org/bukkit/command/SimpleCommandMap.java
+@@ -33,7 +33,7 @@ public class SimpleCommandMap implements CommandMap {
+     private void setDefaultCommands() {
+         register("bukkit", new VersionCommand("version"));
+         register("bukkit", new ReloadCommand("reload"));
+-        register("bukkit", new PluginsCommand("plugins"));
++        //register("bukkit", new PluginsCommand("plugins")); Paper
+         register("bukkit", new co.aikar.timings.TimingsCommand("timings")); // Paper
+     }
+ 
 diff --git a/src/main/java/org/bukkit/plugin/Plugin.java b/src/main/java/org/bukkit/plugin/Plugin.java
 index 08aef59d8443038771704d9587e31f299e587307..3948cebb552ae1873421a8354c686a0b4afff3a7 100644
 --- a/src/main/java/org/bukkit/plugin/Plugin.java
@@ -775,7 +806,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..30a570424743b279931de1c0ba29cf94
              }
              for (String provided : depend.getProvides()) {
 diff --git a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java b/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
-index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..92f2197c10a0c075748fa6feba08cff0b07f3abe 100644
+index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..28d9c533260c77262628b6e52da73df001eed752 100644
 --- a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
 +++ b/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
 @@ -38,6 +38,7 @@ public abstract class JavaPlugin extends PluginBase {
@@ -826,7 +857,7 @@ index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..92f2197c10a0c075748fa6feba08cff0
 -    final void init(@NotNull PluginLoader loader, @NotNull Server server, @NotNull PluginDescriptionFile description, @NotNull File dataFolder, @NotNull File file, @NotNull ClassLoader classLoader) {
 +    // Paper start
 +    public final void init(@NotNull PluginLoader loader, @NotNull Server server, @NotNull PluginDescriptionFile description, @NotNull File dataFolder, @NotNull File file, @NotNull ClassLoader classLoader) {
-+        init(loader, server, description, dataFolder, file, classLoader, null);
++        init(loader, server, description, dataFolder, file, classLoader, description);
 +    }
 +    public final void init(@NotNull PluginLoader loader, @NotNull Server server, @NotNull PluginDescriptionFile description, @NotNull File dataFolder, @NotNull File file, @NotNull ClassLoader classLoader, @Nullable io.papermc.paper.plugin.provider.configuration.PluginConfiguration configuration) {
 +    // Paper end
@@ -837,7 +868,7 @@ index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..92f2197c10a0c075748fa6feba08cff0
          if (this.logger == null) {
              this.logger = com.destroystokyo.paper.utils.PaperPluginLogger.getLogger(this.description);
          }
-+        this.pluginConfiguration = pluginConfiguration;
++        this.pluginConfiguration = configuration;
          // Paper end
      }
  

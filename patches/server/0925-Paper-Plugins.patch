@@ -4,6 +4,210 @@ Date: Wed, 6 Jul 2022 23:00:31 -0400
 Subject: [PATCH] Paper Plugins
 
 
+diff --git a/src/main/java/io/papermc/paper/command/PaperCommands.java b/src/main/java/io/papermc/paper/command/PaperCommands.java
+index 37d28625b9528bbe0cd6d9623e702bbbc2b07883..ab9a00b60eed9da7e61feda90a69563a7ae8d05c 100644
+--- a/src/main/java/io/papermc/paper/command/PaperCommands.java
++++ b/src/main/java/io/papermc/paper/command/PaperCommands.java
+@@ -23,5 +23,6 @@ public final class PaperCommands {
+         COMMANDS.forEach((s, command) -> {
+             server.server.getCommandMap().register(s, "Paper", command);
+         });
++        server.server.getCommandMap().register("bukkit", new PaperPluginsCommand());
+     }
+ }
+diff --git a/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java b/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..fc56067d7a5738aded9b3e0000ed6cf0547c613b
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java
+@@ -0,0 +1,187 @@
++package io.papermc.paper.command;
++
++import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.ProviderStatus;
++import io.papermc.paper.plugin.provider.ProviderStatusHolder;
++import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.provider.service.storage.ServerPluginProviderStorage;
++import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
++import io.papermc.paper.plugin.provider.type.paper.PaperPluginProvider;
++import io.papermc.paper.plugin.provider.type.spigot.SpigotPluginProvider;
++import net.kyori.adventure.text.Component;
++import net.kyori.adventure.text.JoinConfiguration;
++import net.kyori.adventure.text.TextComponent;
++import net.kyori.adventure.text.event.ClickEvent;
++import net.kyori.adventure.text.format.NamedTextColor;
++import net.kyori.adventure.text.format.TextColor;
++import org.bukkit.Bukkit;
++import org.bukkit.command.CommandSender;
++import org.bukkit.command.defaults.BukkitCommand;
++import org.bukkit.plugin.Plugin;
++import org.bukkit.plugin.java.JavaPlugin;
++import org.jetbrains.annotations.NotNull;
++
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.Collections;
++import java.util.List;
++import java.util.Map;
++import java.util.TreeMap;
++
++public class PaperPluginsCommand extends BukkitCommand {
++
++    // TODO: LINK?
++    private static final Component SERVER_PLUGIN_INFO = Component.text("ℹ What is a server plugin?", TextColor.color(52, 159, 218))
++        .append(asPlainComponents("""
++            Server plugins can add new behavior to your server!
++            You can find new plugins on Paper's plugin repository, Hangar.
++                        
++            <link to hangar>
++            """));
++
++    private static final Component SERVER_INITIALIZER_INFO = Component.text("ℹ What is a server initializer?", TextColor.color(52, 159, 218))
++        .append(asPlainComponents("""
++            Server initializers are ran before your server
++            starts and are provided by paper plugins.
++            """));
++
++    private static final Component LEGACY_PLUGIN_INFO = Component.text("ℹ What is a legacy plugin?", TextColor.color(52, 159, 218))
++        .append(asPlainComponents("""
++            A legacy plugin is a plugin that was made on
++            very old unsupported versions of the game.
++                        
++            It is encouraged that you replace this plugin,
++            as they might not work in the future and may cause
++            performance issues.
++            """));
++
++    private static final Component LEGACY_PLUGIN_STAR = Component.text('*', TextColor.color(255, 212, 42))
++        .hoverEvent(LEGACY_PLUGIN_INFO);
++
++    private static final Component INFO_ICON_START = Component.text("ℹ ", TextColor.color(52, 159, 218));
++
++    private static final Component PAPER_HEADER = Component.text("Paper Plugins:", TextColor.color(2, 136, 209));
++    private static final Component BUKKIT_HEADER = Component.text("Bukkit Plugins:", TextColor.color(237, 129, 6));
++
++    private static final Component PLUGIN_TICK = Component.text(" - ", NamedTextColor.DARK_GRAY);
++
++    public PaperPluginsCommand() {
++        super("plugins");
++        this.description = "Gets a list of plugins running on the server";
++        this.usageMessage = "/plugins";
++        this.setPermission("bukkit.command.plugins");
++        this.setAliases(Arrays.asList("pl"));
++    }
++
++    @Override
++    public boolean execute(@NotNull CommandSender sender, @NotNull String currentAlias, @NotNull String[] args) {
++        if (!this.testPermission(sender)) return true;
++
++        // Plugins
++        {
++            TreeMap<String, PluginProvider<JavaPlugin>> paperPlugins = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
++            TreeMap<String, PluginProvider<JavaPlugin>> spigotPlugins = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
++
++            for (PluginProvider<JavaPlugin> provider : ServerPluginProviderStorage.INSTANCE.getRegisteredProviders()) {
++                PluginConfiguration configuration = provider.getConfiguration();
++
++                if (provider instanceof SpigotPluginProvider) {
++                    spigotPlugins.put(configuration.getDisplayName(), provider);
++                } else if (provider instanceof PaperPluginProvider.PaperServerPluginProvider) {
++                    paperPlugins.put(configuration.getDisplayName(), provider);
++                }
++            }
++
++            sender.sendMessage(INFO_ICON_START.hoverEvent(SERVER_PLUGIN_INFO).append(Component.text("Server Plugins (%s):".formatted(paperPlugins.size() + spigotPlugins.size()), NamedTextColor.WHITE)));
++            sender.sendMessage(PAPER_HEADER);
++            sender.sendMessage(formatProviders(paperPlugins));
++            sender.sendMessage(BUKKIT_HEADER);
++            sender.sendMessage(formatProviders(spigotPlugins));
++
++        }
++
++        // Providers
++        /*
++        {
++            TreeMap<String, PluginProvider<Initializer>> providers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
++            for (PluginProvider<Initializer> provider : PreInitProviderStorage.INSTANCE.getRegisteredProviders()) {
++                providers.put(provider.getConfiguration().getIdentifier(), provider);
++            }
++
++            sender.sendMessage(INFO_ICON_START.hoverEvent(SERVER_INITIALIZER_INFO).append(Component.text("Server Initializers (%s):".formatted(providers.size()), NamedTextColor.WHITE)));
++            sender.sendMessage(formatProviders(providers));
++
++        }
++         */
++        return true;
++    }
++
++    @NotNull
++    @Override
++    public List<String> tabComplete(@NotNull CommandSender sender, @NotNull String alias, @NotNull String[] args) throws IllegalArgumentException {
++        return Collections.emptyList();
++    }
++
++    private static <T> Component formatProviders(TreeMap<String, PluginProvider<T>> plugins) {
++        List<Component> components = new ArrayList<>(plugins.size());
++        for (Map.Entry<String, PluginProvider<T>> entry : plugins.entrySet()) {
++            components.add(formatProvider(entry.getValue()));
++        }
++
++        return PLUGIN_TICK.append(Component.join(JoinConfiguration.commas(true), components).color(NamedTextColor.WHITE));
++    }
++
++    private static Component formatProvider(PluginProvider<?> provider) {
++        TextComponent.Builder builder = Component.text();
++        if (provider instanceof SpigotPluginProvider spigotPluginProvider && spigotPluginProvider.isLegacy()) {
++            builder.append(LEGACY_PLUGIN_STAR);
++        }
++
++        String name = provider.getConfiguration().getIdentifier();
++        Component pluginName = Component.text(name, fromStatus(provider))
++            .clickEvent(ClickEvent.runCommand("/version " + name));
++
++        builder.append(pluginName);
++
++        return builder.build();
++    }
++
++    private static Component asPlainComponents(String strings) {
++        net.kyori.adventure.text.TextComponent.Builder builder = Component.text();
++        for (String string : strings.split("\n")) {
++            builder.append(Component.newline());
++            builder.append(Component.text(string, NamedTextColor.WHITE));
++        }
++
++        return builder.build();
++    }
++
++    private static TextColor fromStatus(PluginProvider<?> provider) {
++        if (provider instanceof ProviderStatusHolder statusHolder && statusHolder.getLastProvidedStatus() != null) {
++            ProviderStatus status = statusHolder.getLastProvidedStatus();
++
++            // Handle enabled/disabled game plugins
++            if (status == ProviderStatus.INITIALIZED && provider instanceof JavaPluginProvider javaPluginProvider) {
++                Plugin plugin = Bukkit.getPluginManager().getPlugin(javaPluginProvider.getConfiguration().getIdentifier());
++                // Plugin doesn't exist? Could be due to it being removed.
++                if (plugin == null) {
++                    return NamedTextColor.RED;
++                }
++
++                return plugin.isEnabled() ? NamedTextColor.GREEN : NamedTextColor.RED;
++            }
++
++            return switch (status) {
++                case INITIALIZED -> NamedTextColor.GREEN;
++                case ERRORED -> NamedTextColor.RED;
++            };
++        } else if (provider instanceof PaperPluginProvider.PaperServerPluginProvider serverPluginProvider && serverPluginProvider.shouldSkipCreation()) {
++            // Paper plugins will be skipped if their provider is skipped due to their initializer failing.
++            // Show them as red
++            return NamedTextColor.RED;
++        } else {
++            return NamedTextColor.GRAY;
++        }
++    }
++
++}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/PluginProviders.java b/src/main/java/io/papermc/paper/plugin/provider/PluginProviders.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..277e8b3802d5cb07893be91a27f31b8a349fc691
@@ -76,6 +280,36 @@ index 0000000000000000000000000000000000000000..277e8b3802d5cb07893be91a27f31b8a
 +            LOGGER.error("Could not load '%s' in folder '%s'.".formatted(source.getFileName(), source.getParent()), exception);
 +        }
 +    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/ProviderStatus.java b/src/main/java/io/papermc/paper/plugin/provider/ProviderStatus.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..3f29ba87ce732024f08c56347c98fc26bee99837
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/ProviderStatus.java
+@@ -0,0 +1,10 @@
++package io.papermc.paper.plugin.provider;
++
++import org.jetbrains.annotations.ApiStatus;
++
++@ApiStatus.Internal
++public enum ProviderStatus {
++    INITIALIZED,
++    ERRORED,
++    ;
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/ProviderStatusHolder.java b/src/main/java/io/papermc/paper/plugin/provider/ProviderStatusHolder.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..94023e8b7f5011d4962e7859dd8771ab02f6dc11
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/ProviderStatusHolder.java
+@@ -0,0 +1,8 @@
++package io.papermc.paper.plugin.provider;
++
++public interface ProviderStatusHolder {
++
++    ProviderStatus getLastProvidedStatus();
++
++    void setStatus(ProviderStatus status);
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
 new file mode 100644
@@ -412,14 +646,16 @@ index 0000000000000000000000000000000000000000..314cfd14b0632e4b4f7f2ec1dbd977b0
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/PreInitProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/PreInitProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..96a3349c2bd92a2fe61f834beea4e41226460407
+index 0000000000000000000000000000000000000000..14af4c948f03c9334318566b392df18e692784e3
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/PreInitProviderStorage.java
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,25 @@
 +package io.papermc.paper.plugin.provider.service.storage;
 +
 +import io.papermc.paper.plugin.Initializer;
 +import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.ProviderStatus;
++import io.papermc.paper.plugin.provider.ProviderStatusHolder;
 +
 +public class PreInitProviderStorage extends SimpleProviderStorage<Initializer> {
 +
@@ -432,35 +668,23 @@ index 0000000000000000000000000000000000000000..96a3349c2bd92a2fe61f834beea4e412
 +                provider.createInstance().initialize();
 +            } catch (Exception e) {
 +                provider.getLogger().error("Failed to run initializer for %s in %s".formatted(provider.getSource().getFileName(), provider.getSource().getParent()), e);
++                if (provider instanceof ProviderStatusHolder statusHolder) {
++                    statusHolder.setStatus(ProviderStatus.ERRORED);
++                }
 +            }
 +        }
-+        this.providers.clear(); // Release initializers
 +    }
-+}
-diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/ProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/ProviderStorage.java
-new file mode 100644
-index 0000000000000000000000000000000000000000..4dcefa2b13a523760742fef1decc2952af71fd6e
---- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/ProviderStorage.java
-@@ -0,0 +1,9 @@
-+package io.papermc.paper.plugin.provider.service.storage;
-+
-+import io.papermc.paper.plugin.provider.PluginProvider;
-+
-+public interface ProviderStorage<T> {
-+
-+    void register(PluginProvider<T> provider);
-+
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/ServerPluginProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/ServerPluginProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..bcc667e5513cea85917ff112dd5f5f794817e8e5
+index 0000000000000000000000000000000000000000..469e3e261d17957067c1d14872f0767ed821e388
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/ServerPluginProviderStorage.java
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,32 @@
 +package io.papermc.paper.plugin.provider.service.storage;
 +
 +import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.type.paper.PaperPluginProvider;
 +import org.bukkit.plugin.java.JavaPlugin;
 +
 +import java.nio.file.Path;
@@ -473,6 +697,10 @@ index 0000000000000000000000000000000000000000..bcc667e5513cea85917ff112dd5f5f79
 +        for (PluginProvider<JavaPlugin> provider : this.providers) {
 +            Path path = provider.getSource();
 +            try {
++                if (provider instanceof PaperPluginProvider.PaperServerPluginProvider pluginProvider && pluginProvider.shouldSkipCreation()) {
++                    continue;
++                }
++
 +                JavaPlugin plugin = provider.createInstance();
 +
 +                plugin.getLogger().info(String.format("Loading server plugin %s", plugin.getDescription().getFullName()));
@@ -487,10 +715,10 @@ index 0000000000000000000000000000000000000000..bcc667e5513cea85917ff112dd5f5f79
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/SimpleProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/SimpleProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..30f869cd3942a27a3c5d007dd71f7d1299bb8fde
+index 0000000000000000000000000000000000000000..77e048d9292fe3b1b207504bac6fb9420cbef4a6
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/SimpleProviderStorage.java
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,25 @@
 +package io.papermc.paper.plugin.provider.service.storage;
 +
 +import io.papermc.paper.plugin.provider.PluginProvider;
@@ -510,13 +738,31 @@ index 0000000000000000000000000000000000000000..30f869cd3942a27a3c5d007dd71f7d12
 +    public List<PluginProvider<T>> registered() {
 +        return this.providers;
 +    }
++
++    @Override
++    public Iterable<PluginProvider<T>> getRegisteredProviders() {
++        return this.providers;
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/JavaPluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/type/JavaPluginProvider.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..c7b16e25a140e51ef4dfbba3d036acf68dfb88b5
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/type/JavaPluginProvider.java
+@@ -0,0 +1,7 @@
++package io.papermc.paper.plugin.provider.type;
++
++import io.papermc.paper.plugin.provider.PluginProvider;
++import org.bukkit.plugin.java.JavaPlugin;
++
++public abstract class JavaPluginProvider implements PluginProvider<JavaPlugin> {
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java b/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..24614fb53591004208199fffecb2f66520ee1ea1
+index 0000000000000000000000000000000000000000..20c83105ec104ee280c2d20b9e476c638e8265ba
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,64 @@
 +package io.papermc.paper.plugin.provider.type;
 +
 +import io.papermc.paper.plugin.provider.configuration.PaperPluginConfiguration;
@@ -539,10 +785,13 @@ index 0000000000000000000000000000000000000000..24614fb53591004208199fffecb2f665
 +            PaperPluginProvider parent = PaperPluginProvider.of(file, config, source);
 +
 +            PaperPluginConfiguration configuration = parent.getConfiguration();
++            PaperPluginProvider.PaperInitializerProvider initializerPlugin = null;
 +            if (configuration.getInitializer() != null) {
-+                PreInitProviderStorage.INSTANCE.register(parent.new PaperInitializerPlugin());
++                initializerPlugin = parent.new PaperInitializerProvider();
++                PreInitProviderStorage.INSTANCE.register(initializerPlugin);
 +            }
-+            ServerPluginProviderStorage.INSTANCE.register(parent.new PaperGamePlugin());
++
++            ServerPluginProviderStorage.INSTANCE.register(parent.new PaperServerPluginProvider(initializerPlugin));
 +        }
 +    },
 +    SPIGOT("plugin.yml") {
@@ -590,19 +839,22 @@ index 0000000000000000000000000000000000000000..da931ff6057d3429e3e56c3df3d7abeb
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..abd939d8f21cbfaea464248839850cf04c2842ed
+index 0000000000000000000000000000000000000000..460fdad978aedc2ebf5f785943b0f429524ae9be
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProvider.java
-@@ -0,0 +1,208 @@
+@@ -0,0 +1,251 @@
 +package io.papermc.paper.plugin.provider.type.paper;
 +
 +import com.destroystokyo.paper.util.SneakyThrow;
 +import io.papermc.paper.plugin.Initializer;
 +import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.ProviderStatus;
++import io.papermc.paper.plugin.provider.ProviderStatusHolder;
 +import io.papermc.paper.plugin.provider.configuration.PaperPluginConfiguration;
 +import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
 +import io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoader;
 +import io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoaderStorage;
++import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
 +import org.bukkit.Bukkit;
 +import org.bukkit.plugin.InvalidDescriptionException;
 +import org.bukkit.plugin.InvalidPluginException;
@@ -667,7 +919,8 @@ index 0000000000000000000000000000000000000000..abd939d8f21cbfaea464248839850cf0
 +
 +    @Override
 +    public PaperPlugin createInstance() {
-+        return new PaperPlugin() {}; // Maybe some day
++        return new PaperPlugin() {
++        }; // Maybe some day
 +    }
 +
 +    public PaperPluginConfiguration getConfiguration() {
@@ -679,7 +932,10 @@ index 0000000000000000000000000000000000000000..abd939d8f21cbfaea464248839850cf0
 +        return this.logger;
 +    }
 +
-+    public class PaperInitializerPlugin implements PluginProvider<Initializer> {
++    public class PaperInitializerProvider implements PluginProvider<Initializer>, ProviderStatusHolder {
++
++        private ProviderStatus status;
++
 +        @Override
 +        public @NotNull Path getSource() {
 +            return PaperPluginProvider.this.path;
@@ -719,8 +975,10 @@ index 0000000000000000000000000000000000000000..abd939d8f21cbfaea464248839850cf0
 +                    throw new InvalidPluginException(ex);
 +                }
 +
++                this.status = ProviderStatus.INITIALIZED;
 +                return initializer;
 +            } catch (InvalidPluginException ex) {
++                this.status = ProviderStatus.ERRORED;
 +                SneakyThrow.sneaky(ex);
 +            }
 +
@@ -737,9 +995,28 @@ index 0000000000000000000000000000000000000000..abd939d8f21cbfaea464248839850cf0
 +            return PaperPluginProvider.this.logger;
 +        }
 +
++        @Override
++        public ProviderStatus getLastProvidedStatus() {
++            return this.status;
++        }
++
++        @Override
++        public void setStatus(ProviderStatus status) {
++            this.status = status;
++        }
++
 +    }
 +
-+    public class PaperGamePlugin implements PluginProvider<JavaPlugin> {
++    public class PaperServerPluginProvider extends JavaPluginProvider implements ProviderStatusHolder {
++
++        private ProviderStatus status;
++
++        private final PaperInitializerProvider initializerProvider;
++
++        public PaperServerPluginProvider(PaperInitializerProvider initializerProvider) {
++            this.initializerProvider = initializerProvider;
++        }
++
 +        @Override
 +        public @NotNull Path getSource() {
 +            return PaperPluginProvider.this.path;
@@ -781,8 +1058,10 @@ index 0000000000000000000000000000000000000000..abd939d8f21cbfaea464248839850cf0
 +                }
 +
 +                simplePluginManager.loadPlugin(plugin);
++                this.status = ProviderStatus.INITIALIZED;
 +                return plugin;
 +            } catch (InvalidPluginException ex) {
++                this.status = ProviderStatus.ERRORED;
 +                SneakyThrow.sneaky(ex);
 +            }
 +
@@ -799,19 +1078,34 @@ index 0000000000000000000000000000000000000000..abd939d8f21cbfaea464248839850cf0
 +            return PaperPluginProvider.this.logger;
 +        }
 +
++        @Override
++        public ProviderStatus getLastProvidedStatus() {
++            return this.status;
++        }
++
++        @Override
++        public void setStatus(ProviderStatus status) {
++            this.status = status;
++        }
++
++        public boolean shouldSkipCreation() {
++            return this.initializerProvider.status == ProviderStatus.ERRORED;
++        }
 +    }
 +
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..7e782cf3a3adeef5db7e322fd36c663524a4024e
+index 0000000000000000000000000000000000000000..77d81c3aa4fcfafa33bb7ee796c7558834815c3b
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,118 @@
 +package io.papermc.paper.plugin.provider.type.spigot;
 +
 +import com.destroystokyo.paper.util.SneakyThrow;
-+import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.ProviderStatus;
++import io.papermc.paper.plugin.provider.ProviderStatusHolder;
++import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
 +import org.bukkit.Bukkit;
 +import org.bukkit.plugin.InvalidDescriptionException;
 +import org.bukkit.plugin.InvalidPluginException;
@@ -829,7 +1123,7 @@ index 0000000000000000000000000000000000000000..7e782cf3a3adeef5db7e322fd36c6635
 +import java.util.jar.JarEntry;
 +import java.util.jar.JarFile;
 +
-+public class SpigotPluginProvider implements PluginProvider<JavaPlugin> {
++public class SpigotPluginProvider extends JavaPluginProvider implements ProviderStatusHolder {
 +
 +    public static SpigotPluginProvider of(JarFile file, JarEntry config, Path pluginPath) throws Exception {
 +        PluginDescriptionFile descriptionFile;
@@ -858,6 +1152,8 @@ index 0000000000000000000000000000000000000000..7e782cf3a3adeef5db7e322fd36c6635
 +
 +        return new SpigotPluginProvider(pluginPath, file, descriptionFile);
 +    }
++
++    private ProviderStatus status;
 +
 +    private final Path path;
 +    private final PluginDescriptionFile description;
@@ -888,9 +1184,11 @@ index 0000000000000000000000000000000000000000..7e782cf3a3adeef5db7e322fd36c6635
 +            SimplePluginManager simplePluginManager = (SimplePluginManager) Bukkit.getPluginManager();
 +            JavaPlugin plugin = (JavaPlugin) simplePluginManager.loader.loadPlugin(this.description, this.path.toFile());
 +            simplePluginManager.loadPlugin(plugin);
++            this.status = ProviderStatus.INITIALIZED;
 +            return plugin;
-+        } catch (InvalidPluginException e) {
-+            SneakyThrow.sneaky(e);
++        } catch (InvalidPluginException ex) {
++            this.status = ProviderStatus.ERRORED;
++            SneakyThrow.sneaky(ex);
 +        }
 +
 +        throw new IllegalStateException(); // Shouldn't happen
@@ -904,6 +1202,20 @@ index 0000000000000000000000000000000000000000..7e782cf3a3adeef5db7e322fd36c6635
 +    @Override
 +    public Logger getLogger() {
 +        return this.logger;
++    }
++
++    @Override
++    public ProviderStatus getLastProvidedStatus() {
++        return this.status;
++    }
++
++    @Override
++    public void setStatus(ProviderStatus status) {
++        this.status = status;
++    }
++
++    public boolean isLegacy() {
++        return !Bukkit.getUnsafe().isSupportedApiVersion(this.description.getAPIVersion());
 +    }
 +}
 diff --git a/src/main/java/net/minecraft/server/Main.java b/src/main/java/net/minecraft/server/Main.java
