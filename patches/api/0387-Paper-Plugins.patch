@@ -4,6 +4,19 @@ Date: Wed, 6 Jul 2022 23:00:36 -0400
 Subject: [PATCH] Paper Plugins
 
 
+diff --git a/build.gradle.kts b/build.gradle.kts
+index 0660174a8c543b3e8ef317cfabcda88a6a53d844..9330ca21acf6f6a0e4caa6cc619d760aafc3a605 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -46,7 +46,7 @@ dependencies {
+     implementation("org.ow2.asm:asm-commons:9.2")
+     // Paper end
+ 
+-    compileOnly("org.apache.maven:maven-resolver-provider:3.8.5")
++    api("org.apache.maven:maven-resolver-provider:3.8.5") // Paper, expose
+     compileOnly("org.apache.maven.resolver:maven-resolver-connector-basic:1.7.3")
+     compileOnly("org.apache.maven.resolver:maven-resolver-transport-http:1.7.3")
+     compileOnly("com.google.code.findbugs:jsr305:1.3.9") // Paper
 diff --git a/src/main/java/com/destroystokyo/paper/utils/PaperPluginLogger.java b/src/main/java/com/destroystokyo/paper/utils/PaperPluginLogger.java
 index 76f2cb9cd99cad2a9484eab2becd8c36f1dd91b3..04cc721f95bfdf861f828cc853f7b8d12c9bbb1b 100644
 --- a/src/main/java/com/destroystokyo/paper/utils/PaperPluginLogger.java
@@ -39,20 +52,38 @@ index 76f2cb9cd99cad2a9484eab2becd8c36f1dd91b3..04cc721f95bfdf861f828cc853f7b8d1
      }
  
      @Override
-diff --git a/src/main/java/io/papermc/paper/plugin/Initializer.java b/src/main/java/io/papermc/paper/plugin/Initializer.java
+diff --git a/src/main/java/io/papermc/paper/plugin/PluginBootstrap.java b/src/main/java/io/papermc/paper/plugin/PluginBootstrap.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..8c43fb9c04cf92e04f4ca6a1a02de7585764669e
+index 0000000000000000000000000000000000000000..8cfb0710c6ee39335b0b8867fd3b83f88f1bddbd
 --- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/Initializer.java
++++ b/src/main/java/io/papermc/paper/plugin/PluginBootstrap.java
 @@ -0,0 +1,10 @@
 +package io.papermc.paper.plugin;
 +
 +/**
 + *
 + */
-+public interface Initializer {
++public interface PluginBootstrap {
 +
-+    void initialize();
++    void boostrap();
++
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/PluginLoader.java b/src/main/java/io/papermc/paper/plugin/PluginLoader.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..49f679d209aee307767f956916001f8b1b0d4ef5
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/PluginLoader.java
+@@ -0,0 +1,12 @@
++package io.papermc.paper.plugin;
++
++import io.papermc.paper.plugin.provider.loader.PluginClasspathBuilder;
++
++/**
++ *
++ */
++public interface PluginLoader {
++
++    void classloader(PluginClasspathBuilder classpathBuilder);
 +
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
@@ -256,12 +287,209 @@ index 0000000000000000000000000000000000000000..cc95602f3f2db155ef8c434b9ce30e02
 +
 +    List<String> getProvides();
 +}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/PluginClasspathBuilder.java b/src/main/java/io/papermc/paper/plugin/provider/loader/PluginClasspathBuilder.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a7ffea9e1e1d5b33328809b8f1bd4143aa4ee7f
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/loader/PluginClasspathBuilder.java
+@@ -0,0 +1,8 @@
++package io.papermc.paper.plugin.provider.loader;
++
++import io.papermc.paper.plugin.provider.loader.library.ClassPathLibrary;
++
++public interface PluginClasspathBuilder {
++
++    PluginClasspathBuilder addLibrary(ClassPathLibrary classPathLibrary);
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/library/ClassPathLibrary.java b/src/main/java/io/papermc/paper/plugin/provider/loader/library/ClassPathLibrary.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..2e94343f0605c2309472355e059f76988eb3dbec
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/loader/library/ClassPathLibrary.java
+@@ -0,0 +1,6 @@
++package io.papermc.paper.plugin.provider.loader.library;
++
++public interface ClassPathLibrary {
++
++    void addToLibraryStore(LibraryStore store) throws LibraryLoadingException;
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryLoadingException.java b/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryLoadingException.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d26a6a97b891858842fa7928ed78ba0ddf1dd5f1
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryLoadingException.java
+@@ -0,0 +1,12 @@
++package io.papermc.paper.plugin.provider.loader.library;
++
++public class LibraryLoadingException extends RuntimeException {
++
++    public LibraryLoadingException(String s) {
++        super(s);
++    }
++
++    public LibraryLoadingException(String s, Exception e) {
++        super(s, e);
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryStore.java b/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryStore.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..5e227c29830355ead3440337ad8b50a426896e88
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryStore.java
+@@ -0,0 +1,9 @@
++package io.papermc.paper.plugin.provider.loader.library;
++
++import java.nio.file.Path;
++
++public interface LibraryStore {
++
++    void addLibrary(Path library);
++
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/JarLibrary.java b/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/JarLibrary.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d02b80d14b9425f4a27d0efa2f0b41896e3811c6
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/JarLibrary.java
+@@ -0,0 +1,25 @@
++package io.papermc.paper.plugin.provider.loader.library.impl;
++
++import io.papermc.paper.plugin.provider.loader.library.ClassPathLibrary;
++import io.papermc.paper.plugin.provider.loader.library.LibraryLoadingException;
++import io.papermc.paper.plugin.provider.loader.library.LibraryStore;
++
++import java.nio.file.Files;
++import java.nio.file.Path;
++
++public class JarLibrary implements ClassPathLibrary {
++
++    private final Path path;
++
++    public JarLibrary(Path path) {
++        this.path = path;
++    }
++
++    @Override
++    public void addToLibraryStore(LibraryStore store) throws LibraryLoadingException {
++        if (Files.notExists(this.path)) {
++            throw new LibraryLoadingException("Could not find library at " + this.path.toString());
++        }
++
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/maven/MavenLibraryResolver.java b/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/maven/MavenLibraryResolver.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..94098da7c38678f4a2069dd47f80bbde3c1ea707
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/maven/MavenLibraryResolver.java
+@@ -0,0 +1,101 @@
++package io.papermc.paper.plugin.provider.loader.library.impl.maven;
++
++import io.papermc.paper.plugin.provider.loader.library.ClassPathLibrary;
++import io.papermc.paper.plugin.provider.loader.library.LibraryLoadingException;
++import io.papermc.paper.plugin.provider.loader.library.LibraryStore;
++import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
++import org.eclipse.aether.DefaultRepositorySystemSession;
++import org.eclipse.aether.RepositorySystem;
++import org.eclipse.aether.collection.CollectRequest;
++import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
++import org.eclipse.aether.graph.Dependency;
++import org.eclipse.aether.graph.DependencyFilter;
++import org.eclipse.aether.impl.DefaultServiceLocator;
++import org.eclipse.aether.repository.LocalRepository;
++import org.eclipse.aether.repository.RemoteRepository;
++import org.eclipse.aether.repository.RepositoryPolicy;
++import org.eclipse.aether.resolution.ArtifactResult;
++import org.eclipse.aether.resolution.DependencyRequest;
++import org.eclipse.aether.resolution.DependencyResolutionException;
++import org.eclipse.aether.resolution.DependencyResult;
++import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
++import org.eclipse.aether.spi.connector.transport.TransporterFactory;
++import org.eclipse.aether.transfer.AbstractTransferListener;
++import org.eclipse.aether.transfer.TransferCancelledException;
++import org.eclipse.aether.transfer.TransferEvent;
++import org.eclipse.aether.transport.http.HttpTransporterFactory;
++import org.jetbrains.annotations.NotNull;
++
++import java.io.File;
++import java.net.MalformedURLException;
++import java.net.URL;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.logging.Level;
++import java.util.logging.Logger;
++
++public class MavenLibraryResolver implements ClassPathLibrary {
++
++    private Logger logger = Logger.getLogger("MavenLibraryResolver");
++
++    private final RepositorySystem repository;
++    private final DefaultRepositorySystemSession session;
++    private final List<RemoteRepository> repositories = new ArrayList<>();
++    private final List<Dependency> dependencies = new ArrayList<>();
++
++    private DependencyFilter filter;
++
++    public MavenLibraryResolver() {
++
++        DefaultServiceLocator locator = MavenRepositorySystemUtils.newServiceLocator();
++        locator.addService(RepositoryConnectorFactory.class, BasicRepositoryConnectorFactory.class);
++        locator.addService(TransporterFactory.class, HttpTransporterFactory.class);
++
++        this.repository = locator.getService(RepositorySystem.class);
++        this.session = MavenRepositorySystemUtils.newSession();
++
++        this.session.setChecksumPolicy(RepositoryPolicy.CHECKSUM_POLICY_FAIL);
++        this.session.setLocalRepositoryManager(this.repository.newLocalRepositoryManager(this.session, new LocalRepository("libraries")));
++        this.session.setTransferListener(new AbstractTransferListener() {
++            @Override
++            public void transferInitiated(TransferEvent event) throws TransferCancelledException {
++                MavenLibraryResolver.this.logger.log(Level.INFO, "Downloading {0}", event.getResource().getRepositoryUrl() + event.getResource().getResourceName());
++            }
++        });
++        this.session.setReadOnly();
++    }
++
++    public void setLogger(Logger logger) {
++        this.logger = logger;
++    }
++
++    public void addDependency(Dependency dependency) {
++        this.dependencies.add(dependency);
++    }
++
++    public void addRepository(RemoteRepository remoteRepository) {
++        this.repositories.add(remoteRepository);
++    }
++
++    // Is this supposed to be per repo lookup? Idk it's just grouped up here
++    public void setFilter(DependencyFilter filter) {
++        this.filter = filter;
++    }
++
++    @Override
++    public void addToLibraryStore(LibraryStore store) throws LibraryLoadingException {
++        List<RemoteRepository> repos = this.repository.newResolutionRepositories(this.session, this.repositories);
++
++        DependencyResult result;
++        try {
++            result = this.repository.resolveDependencies(this.session, new DependencyRequest(new CollectRequest((Dependency) null, this.dependencies, repos), this.filter));
++        } catch (DependencyResolutionException ex) {
++            throw new LibraryLoadingException("Error resolving libraries", ex);
++        }
++
++        for (ArtifactResult artifact : result.getArtifactResults()) {
++            File file = artifact.getArtifact().getFile();
++            store.addLibrary(file.toPath());
++        }
++    }
++}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..4f5c44b09d408b4c4e0f650b4b1a4b85bbb630f2
+index 0000000000000000000000000000000000000000..e51d34c3ed4beda246bafe302e0fe8d84fb18870
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
-@@ -0,0 +1,252 @@
+@@ -0,0 +1,260 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
 +import com.google.common.io.ByteStreams;
@@ -297,6 +525,7 @@ index 0000000000000000000000000000000000000000..4f5c44b09d408b4c4e0f650b4b1a4b85
 +public class PaperPluginClassLoader extends URLClassLoader {
 +
 +    private final PaperPluginClassLoaderStorage loader;
++    private final ClassLoader libraryLoader;
 +
 +    private final Map<String, Class<?>> loadedClasses = new ConcurrentHashMap<>();
 +
@@ -312,10 +541,10 @@ index 0000000000000000000000000000000000000000..4f5c44b09d408b4c4e0f650b4b1a4b85
 +        ClassLoader.registerAsParallelCapable();
 +    }
 +
-+    public PaperPluginClassLoader(@NotNull PaperPluginClassLoaderStorage loader, PluginProvider<?> pluginProvider, ClassLoader parentLoader) throws IOException {
++    public PaperPluginClassLoader(@NotNull PaperPluginClassLoaderStorage loader, PluginProvider<?> pluginProvider, ClassLoader parentLoader, ClassLoader libraryLoader) throws IOException {
 +        super(pluginProvider.getSource().getFileName().toString(), new URL[]{pluginProvider.getSource().toUri().toURL()}, parentLoader);
-+
 +        this.loader = loader;
++        this.libraryLoader = libraryLoader;
 +
 +        this.pluginProvider = pluginProvider;
 +        // TODO: Are these needed? Want to avoid overhead by converting
@@ -338,11 +567,11 @@ index 0000000000000000000000000000000000000000..4f5c44b09d408b4c4e0f650b4b1a4b85
 +
 +    @Override
 +    protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-+        return this.loadClass(name, resolve, true);
++        return this.loadClass(name, resolve, true, true);
 +    }
 +
-+    // We do not use the library loader
-+    public Class<?> loadClass(@NotNull String name, boolean resolve, boolean checkGlobal) throws ClassNotFoundException {
++    // TODO: ((SimplePluginManager) server.getPluginManager()).isTransitiveDepend(description, requester.getDescription())
++    public Class<?> loadClass(@NotNull String name, boolean resolve, boolean checkGlobal, boolean checkLibraries) throws ClassNotFoundException {
 +        try {
 +            Class<?> result = super.loadClass(name, resolve);
 +
@@ -351,6 +580,13 @@ index 0000000000000000000000000000000000000000..4f5c44b09d408b4c4e0f650b4b1a4b85
 +                return result;
 +            }
 +        } catch (ClassNotFoundException ex) {
++        }
++
++        if (checkLibraries) {
++            try {
++                return this.libraryLoader.loadClass(name);
++            } catch (ClassNotFoundException ex) {
++            }
 +        }
 +
 +        if (checkGlobal) {
@@ -516,7 +752,7 @@ index 0000000000000000000000000000000000000000..4f5c44b09d408b4c4e0f650b4b1a4b85
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoaderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoaderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..672d06cb5e3c4cfd584d0c868b24891aa36480ac
+index 0000000000000000000000000000000000000000..e1df8ba447e10e7b6ab79a3f7515fbc9c49e918c
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoaderStorage.java
 @@ -0,0 +1,107 @@
@@ -582,7 +818,7 @@ index 0000000000000000000000000000000000000000..672d06cb5e3c4cfd584d0c868b24891a
 +            // Paper end
 +            for (PaperPluginClassLoader loader : this.classLoaders) {
 +                try {
-+                    return loader.loadClass(name, resolve, false);
++                    return loader.loadClass(name, resolve, false, true);
 +                } catch (ClassNotFoundException cnfe) {
 +                }
 +            }
@@ -626,6 +862,48 @@ index 0000000000000000000000000000000000000000..672d06cb5e3c4cfd584d0c868b24891a
 +    public boolean contains(PluginClassLoader pluginLoader) {
 +        return this.spigotClassLoaders.contains(pluginLoader);
 +    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..93d031621d2e2dc7fffc2b73d4c5f0f8bce8f7e9
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java
+@@ -0,0 +1,36 @@
++package io.papermc.paper.plugin.provider.service.classloader;
++
++import io.papermc.paper.plugin.provider.PluginProvider;
++
++import java.io.IOException;
++import java.net.MalformedURLException;
++import java.net.URL;
++import java.net.URLClassLoader;
++import java.util.Enumeration;
++
++public class PaperSimplePluginClassLoader extends URLClassLoader {
++    
++    public PaperSimplePluginClassLoader(PluginProvider<?> pluginProvider, ClassLoader parentLoader) throws MalformedURLException {
++        super(pluginProvider.getSource().getFileName().toString(), new URL[]{pluginProvider.getSource().toUri().toURL()}, parentLoader);
++    }
++
++    @Override
++    public URL getResource(String name) {
++        return this.findResource(name);
++    }
++
++    @Override
++    public Enumeration<URL> getResources(String name) throws IOException {
++        return this.findResources(name);
++    }
++
++    @Override
++    protected Class<?> findClass(String name) throws ClassNotFoundException {
++        if (name.startsWith("org.bukkit.") || name.startsWith("net.minecraft.")) { // TODO: Is this needed?
++            throw new ClassNotFoundException(name);
++        }
++
++        return super.findClass(name);
++    }
++
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/ProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/ProviderStorage.java
 new file mode 100644
