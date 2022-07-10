@@ -17,20 +17,20 @@ index 37d28625b9528bbe0cd6d9623e702bbbc2b07883..ab9a00b60eed9da7e61feda90a69563a
  }
 diff --git a/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java b/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..7a5ce1c898a550dd02f8cad3a8b3b874aa6b358c
+index 0000000000000000000000000000000000000000..434cdcaed998c469b9ce9207d3a4681437cb632c
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java
-@@ -0,0 +1,188 @@
+@@ -0,0 +1,217 @@
 +package io.papermc.paper.command;
 +
++import com.google.common.collect.Lists;
 +import io.papermc.paper.plugin.provider.PluginProvider;
 +import io.papermc.paper.plugin.provider.ProviderStatus;
 +import io.papermc.paper.plugin.provider.ProviderStatusHolder;
 +import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
-+import io.papermc.paper.plugin.provider.service.storage.ServerPluginProviderStorage;
++import io.papermc.paper.plugin.provider.service.storage.plugin.ServerPluginProviderStorage;
 +import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
 +import io.papermc.paper.plugin.provider.type.paper.PaperPluginParentProvider;
-+import io.papermc.paper.plugin.provider.type.paper.PaperPluginProvider;
 +import io.papermc.paper.plugin.provider.type.spigot.SpigotPluginProvider;
 +import net.kyori.adventure.text.Component;
 +import net.kyori.adventure.text.JoinConfiguration;
@@ -54,8 +54,10 @@ index 0000000000000000000000000000000000000000..7a5ce1c898a550dd02f8cad3a8b3b874
 +
 +public class PaperPluginsCommand extends BukkitCommand {
 +
++    private static final TextColor INFO_COLOR = TextColor.color(52, 159, 218);
++
 +    // TODO: LINK?
-+    private static final Component SERVER_PLUGIN_INFO = Component.text("ℹ What is a server plugin?", TextColor.color(52, 159, 218))
++    private static final Component SERVER_PLUGIN_INFO = Component.text("ℹ What is a server plugin?", INFO_COLOR)
 +        .append(asPlainComponents("""
 +            Server plugins can add new behavior to your server!
 +            You can find new plugins on Paper's plugin repository, Hangar.
@@ -63,13 +65,13 @@ index 0000000000000000000000000000000000000000..7a5ce1c898a550dd02f8cad3a8b3b874
 +            <link to hangar>
 +            """));
 +
-+    private static final Component SERVER_INITIALIZER_INFO = Component.text("ℹ What is a server initializer?", TextColor.color(52, 159, 218))
++    private static final Component SERVER_INITIALIZER_INFO = Component.text("ℹ What is a server initializer?", INFO_COLOR)
 +        .append(asPlainComponents("""
 +            Server initializers are ran before your server
 +            starts and are provided by paper plugins.
 +            """));
 +
-+    private static final Component LEGACY_PLUGIN_INFO = Component.text("ℹ What is a legacy plugin?", TextColor.color(52, 159, 218))
++    private static final Component LEGACY_PLUGIN_INFO = Component.text("ℹ What is a legacy plugin?", INFO_COLOR)
 +        .append(asPlainComponents("""
 +            A legacy plugin is a plugin that was made on
 +            very old unsupported versions of the game.
@@ -79,15 +81,16 @@ index 0000000000000000000000000000000000000000..7a5ce1c898a550dd02f8cad3a8b3b874
 +            performance issues.
 +            """));
 +
-+    private static final Component LEGACY_PLUGIN_STAR = Component.text('*', TextColor.color(255, 212, 42))
-+        .hoverEvent(LEGACY_PLUGIN_INFO);
-+
-+    private static final Component INFO_ICON_START = Component.text("ℹ ", TextColor.color(52, 159, 218));
++    private static final Component INFO_ICON_START = Component.text("ℹ ", INFO_COLOR);
 +
 +    private static final Component PAPER_HEADER = Component.text("Paper Plugins:", TextColor.color(2, 136, 209));
 +    private static final Component BUKKIT_HEADER = Component.text("Bukkit Plugins:", TextColor.color(237, 129, 6));
 +
-+    private static final Component PLUGIN_TICK = Component.text(" - ", NamedTextColor.DARK_GRAY);
++    private static final Component PLUGIN_TICK = Component.text("- ", NamedTextColor.DARK_GRAY);
++    private static final Component PLUGIN_TICK_EMPTY = Component.text(" ");
++
++    private static final Component LEGACY_PLUGIN_STAR = Component.text('*', TextColor.color(255, 212, 42))
++        .hoverEvent(LEGACY_PLUGIN_INFO);
 +
 +    public PaperPluginsCommand() {
 +        super("plugins");
@@ -118,9 +121,13 @@ index 0000000000000000000000000000000000000000..7a5ce1c898a550dd02f8cad3a8b3b874
 +
 +            sender.sendMessage(INFO_ICON_START.hoverEvent(SERVER_PLUGIN_INFO).append(Component.text("Server Plugins (%s):".formatted(paperPlugins.size() + spigotPlugins.size()), NamedTextColor.WHITE)));
 +            sender.sendMessage(PAPER_HEADER);
-+            sender.sendMessage(formatProviders(paperPlugins));
++            for (Component component : formatProviders(paperPlugins)) {
++                sender.sendMessage(component);
++            }
 +            sender.sendMessage(BUKKIT_HEADER);
-+            sender.sendMessage(formatProviders(spigotPlugins));
++            for (Component component : formatProviders(spigotPlugins)) {
++                sender.sendMessage(component);
++            }
 +
 +        }
 +
@@ -146,13 +153,35 @@ index 0000000000000000000000000000000000000000..7a5ce1c898a550dd02f8cad3a8b3b874
 +        return Collections.emptyList();
 +    }
 +
-+    private static <T> Component formatProviders(TreeMap<String, PluginProvider<T>> plugins) {
++    private static <T> List<Component> formatProviders(TreeMap<String, PluginProvider<T>> plugins) {
 +        List<Component> components = new ArrayList<>(plugins.size());
 +        for (Map.Entry<String, PluginProvider<T>> entry : plugins.entrySet()) {
 +            components.add(formatProvider(entry.getValue()));
 +        }
 +
-+        return PLUGIN_TICK.append(Component.join(JoinConfiguration.commas(true), components).color(NamedTextColor.WHITE));
++        boolean isFirst = true;
++        List<Component> formattedSublists = new ArrayList<>();
++        /*
++        Split up the plugin list for each 10 plugins to get size down
++
++        Plugin List:
++        - Plugin 1, Plugin 2, .... Plugin 10,
++          Plugin 11, Plugin 12 ... Plugin 20,
++         */
++        for (List<Component> componentSublist : Lists.partition(components, 10)) {
++            Component component = Component.space();
++            if (isFirst) {
++                component = component.append(PLUGIN_TICK);
++                isFirst = false;
++            } else {
++                component = PLUGIN_TICK_EMPTY;
++                //formattedSublists.add(Component.empty()); // Add an empty line, the auto chat wrapping and this makes it quite jarring.
++            }
++
++            formattedSublists.add(component.append(Component.join(JoinConfiguration.commas(true), componentSublist)));
++        }
++
++        return formattedSublists;
 +    }
 +
 +    private static Component formatProvider(PluginProvider<?> provider) {
@@ -764,45 +793,6 @@ index 0000000000000000000000000000000000000000..fa94167138f1f7975ed85ca82d1c0c70
 +        }
 +    }
 +}
-diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/ServerPluginProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/ServerPluginProviderStorage.java
-new file mode 100644
-index 0000000000000000000000000000000000000000..3a9ebd0682f8dfb3b0fb22b0e2feac78b3b2364c
---- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/ServerPluginProviderStorage.java
-@@ -0,0 +1,33 @@
-+package io.papermc.paper.plugin.provider.service.storage;
-+
-+import io.papermc.paper.plugin.provider.PluginProvider;
-+import io.papermc.paper.plugin.provider.type.paper.PaperPluginParentProvider;
-+import io.papermc.paper.plugin.provider.type.paper.PaperPluginProvider;
-+import org.bukkit.plugin.java.JavaPlugin;
-+
-+import java.nio.file.Path;
-+
-+public class ServerPluginProviderStorage extends SimpleProviderStorage<JavaPlugin> {
-+
-+    public static final ServerPluginProviderStorage INSTANCE = new ServerPluginProviderStorage();
-+
-+    public void loadAll() {
-+        for (PluginProvider<JavaPlugin> provider : this.providers) {
-+            Path path = provider.getSource();
-+            try {
-+                if (provider instanceof PaperPluginParentProvider.PaperServerPluginProvider pluginProvider && pluginProvider.shouldSkipCreation()) {
-+                    continue;
-+                }
-+
-+                JavaPlugin plugin = provider.createInstance();
-+
-+                plugin.getLogger().info(String.format("Loading server plugin %s", plugin.getDescription().getFullName()));
-+                plugin.onLoad();
-+
-+            } catch (Throwable ex) {
-+                provider.getLogger().error("Could not load server plugin '%s' in folder '%s' (Is it up to date?)".formatted(path.getFileName(), path.getParent()), ex);
-+            }
-+        }
-+    }
-+
-+}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/SimpleProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/SimpleProviderStorage.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..77e048d9292fe3b1b207504bac6fb9420cbef4a6
@@ -834,6 +824,884 @@ index 0000000000000000000000000000000000000000..77e048d9292fe3b1b207504bac6fb942
 +        return this.providers;
 +    }
 +}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/ServerPluginProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/ServerPluginProviderStorage.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..20af1c474c7e3be78aa5f151a4fd322f0f55c727
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/ServerPluginProviderStorage.java
+@@ -0,0 +1,36 @@
++package io.papermc.paper.plugin.provider.service.storage.plugin;
++
++import io.papermc.paper.configuration.GlobalConfiguration;
++import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.service.storage.SimpleProviderStorage;
++import io.papermc.paper.plugin.provider.service.storage.plugin.strategy.PluginLoadingStrategy;
++import io.papermc.paper.plugin.provider.service.storage.plugin.strategy.impl.LegacyPluginLoadingStrategy;
++import io.papermc.paper.plugin.provider.service.storage.plugin.strategy.impl.ModernPluginLoadingStrategy;
++import io.papermc.paper.plugin.provider.type.paper.PaperPluginParentProvider;
++import org.bukkit.plugin.java.JavaPlugin;
++
++import java.util.ArrayList;
++import java.util.List;
++
++public class ServerPluginProviderStorage extends SimpleProviderStorage<JavaPlugin> {
++
++    public static final ServerPluginProviderStorage INSTANCE = new ServerPluginProviderStorage();
++
++    public void loadAll() {
++
++        PluginLoadingStrategy strategy = switch (GlobalConfiguration.get().misc.pluginLoadingStrategy) {
++            case MODERN -> ModernPluginLoadingStrategy.INSTANCE;
++            case LEGACY -> LegacyPluginLoadingStrategy.INSTANCE;
++        };
++
++
++        List<PluginProvider<JavaPlugin>> providerList = new ArrayList<>(this.providers);
++        /*
++        Have to do this to prevent loading plugin providers that have failed initializers.
++        This is a hack and a better solution here would be to store failed plugin providers elsewhere.
++         */
++        providerList.removeIf((provider) -> (provider instanceof PaperPluginParentProvider.PaperServerPluginProvider pluginProvider && pluginProvider.shouldSkipCreation()));
++        strategy.loadPlugins(providerList);
++    }
++
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/PluginLoadingStrategy.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/PluginLoadingStrategy.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1f7970d642f67143072179f33d147c9684f268dc
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/PluginLoadingStrategy.java
+@@ -0,0 +1,12 @@
++package io.papermc.paper.plugin.provider.service.storage.plugin.strategy;
++
++import io.papermc.paper.plugin.provider.PluginProvider;
++import org.bukkit.plugin.java.JavaPlugin;
++
++import java.util.List;
++import java.util.logging.Logger;
++
++public interface PluginLoadingStrategy {
++
++    void loadPlugins(List<PluginProvider<JavaPlugin>> plugins);
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/GraphCycleException.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/GraphCycleException.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..7bcfed842aa197b1bfb25da2e521eb3d1be07770
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/GraphCycleException.java
+@@ -0,0 +1,4 @@
++package io.papermc.paper.plugin.provider.service.storage.plugin.strategy.impl;
++
++public class GraphCycleException extends Exception {
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/JohnsonSimpleCycles.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/JohnsonSimpleCycles.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..468548632b2f98f4f8b2a15f282851b65369bb91
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/JohnsonSimpleCycles.java
+@@ -0,0 +1,344 @@
++/*
++ * (C) Copyright 2013-2021, by Nikolay Ognyanov and Contributors.
++ *
++ * JGraphT : a free Java graph-theory library
++ *
++ * See the CONTRIBUTORS.md file distributed with this work for additional
++ * information regarding copyright ownership.
++ *
++ * This program and the accompanying materials are made available under the
++ * terms of the Eclipse Public License 2.0 which is available at
++ * http://www.eclipse.org/legal/epl-2.0, or the
++ * GNU Lesser General Public License v2.1 or later
++ * which is available at
++ * http://www.gnu.org/licenses/old-licenses/lgpl-2.1-standalone.html.
++ *
++ * SPDX-License-Identifier: EPL-2.0 OR LGPL-2.1-or-later
++ */
++
++// MODIFICATIONS:
++// - Modified to use a guava graph directly
++
++package io.papermc.paper.plugin.provider.service.storage.plugin.strategy.impl;
++
++import com.google.common.base.Preconditions;
++import com.google.common.graph.Graph;
++import com.google.common.graph.GraphBuilder;
++import com.google.common.graph.MutableGraph;
++import com.mojang.datafixers.util.Pair;
++
++import java.util.*;
++import java.util.function.Consumer;
++
++/**
++ * Find all simple cycles of a directed graph using the Johnson's algorithm.
++ *
++ * <p>
++ * See:<br>
++ * D.B.Johnson, Finding all the elementary circuits of a directed graph, SIAM J. Comput., 4 (1975),
++ * pp. 77-84.
++ *
++ * @param <V> the vertex type.
++ *
++ * @author Nikolay Ognyanov
++ */
++public class JohnsonSimpleCycles<V>
++{
++    // The graph.
++    private Graph<V> graph;
++
++    // The main state of the algorithm.
++    private Consumer<List<V>> cycleConsumer = null;
++    private V[] iToV = null;
++    private Map<V, Integer> vToI = null;
++    private Set<V> blocked = null;
++    private Map<V, Set<V>> bSets = null;
++    private ArrayDeque<V> stack = null;
++
++    // The state of the embedded Tarjan SCC algorithm.
++    private List<Set<V>> foundSCCs = null;
++    private int index = 0;
++    private Map<V, Integer> vIndex = null;
++    private Map<V, Integer> vLowlink = null;
++    private ArrayDeque<V> path = null;
++    private Set<V> pathSet = null;
++
++    /**
++     * Create a simple cycle finder for the specified graph.
++     *
++     * @param graph - the DirectedGraph in which to find cycles.
++     *
++     * @throws IllegalArgumentException if the graph argument is <code>
++     * null</code>.
++     */
++    public JohnsonSimpleCycles(Graph<V> graph)
++    {
++        Preconditions.checkState(graph.isDirected(), "Graph must be directed");
++        this.graph = graph;
++    }
++
++    /**
++     * Find the simple cycles of the graph.
++     *
++     * @return The list of all simple cycles. Possibly empty but never <code>null</code>.
++     */
++    public List<List<V>> findSimpleCycles()
++    {
++        List<List<V>> result = new ArrayList<>();
++        findSimpleCycles(result::add);
++        return result;
++    }
++
++    /**
++     * Find the simple cycles of the graph.
++     *
++     * @param consumer Consumer that will be called with each cycle found.
++     */
++    public void findSimpleCycles(Consumer<List<V>> consumer)
++    {
++        if (graph == null) {
++            throw new IllegalArgumentException("Null graph.");
++        }
++        initState(consumer);
++
++        int startIndex = 0;
++        int size = graph.nodes().size();
++        while (startIndex < size) {
++            Pair<Graph<V>, Integer> minSCCGResult = findMinSCSG(startIndex);
++            if (minSCCGResult != null) {
++                startIndex = minSCCGResult.getSecond();
++                Graph<V> scg = minSCCGResult.getFirst();
++                V startV = toV(startIndex);
++                for (V v : scg.successors(startV)) {
++                    blocked.remove(v);
++                    getBSet(v).clear();
++                }
++                findCyclesInSCG(startIndex, startIndex, scg);
++                startIndex++;
++            } else {
++                break;
++            }
++        }
++
++        clearState();
++    }
++
++    private Pair<Graph<V>, Integer> findMinSCSG(int startIndex)
++    {
++        /*
++         * Per Johnson : "adjacency structure of strong component $K$ with least vertex in subgraph
++         * of $G$ induced by $(s, s + 1, n)$". Or in contemporary terms: the strongly connected
++         * component of the subgraph induced by $(v_1, \dotso ,v_n)$ which contains the minimum
++         * (among those SCCs) vertex index. We return that index together with the graph.
++         */
++        initMinSCGState();
++
++        List<Set<V>> foundSCCs = findSCCS(startIndex);
++
++        // find the SCC with the minimum index
++        int minIndexFound = Integer.MAX_VALUE;
++        Set<V> minSCC = null;
++        for (Set<V> scc : foundSCCs) {
++            for (V v : scc) {
++                int t = toI(v);
++                if (t < minIndexFound) {
++                    minIndexFound = t;
++                    minSCC = scc;
++                }
++            }
++        }
++        if (minSCC == null) {
++            return null;
++        }
++
++        // build a graph for the SCC found
++        MutableGraph<V> dependencyGraph = GraphBuilder.directed().allowsSelfLoops(true).build();
++
++        for (V v : minSCC) {
++            for (V w : minSCC) {
++                if (graph.hasEdgeConnecting(v, w)) {
++                    dependencyGraph.putEdge(v, w);
++                }
++            }
++        }
++
++        Pair<Graph<V>, Integer> result = Pair.of(dependencyGraph, minIndexFound);
++        clearMinSCCState();
++        return result;
++    }
++
++    private List<Set<V>> findSCCS(int startIndex)
++    {
++        // Find SCCs in the subgraph induced
++        // by vertices startIndex and beyond.
++        // A call to StrongConnectivityAlgorithm
++        // would be too expensive because of the
++        // need to materialize the subgraph.
++        // So - do a local search by the Tarjan's
++        // algorithm and pretend that vertices
++        // with an index smaller than startIndex
++        // do not exist.
++        for (V v : graph.nodes()) {
++            int vI = toI(v);
++            if (vI < startIndex) {
++                continue;
++            }
++            if (!vIndex.containsKey(v)) {
++                getSCCs(startIndex, vI);
++            }
++        }
++        List<Set<V>> result = foundSCCs;
++        foundSCCs = null;
++        return result;
++    }
++
++    private void getSCCs(int startIndex, int vertexIndex)
++    {
++        V vertex = toV(vertexIndex);
++        vIndex.put(vertex, index);
++        vLowlink.put(vertex, index);
++        index++;
++        path.push(vertex);
++        pathSet.add(vertex);
++
++        Set<V> edges = graph.successors(vertex);
++        for (V successor : edges) {
++            int successorIndex = toI(successor);
++            if (successorIndex < startIndex) {
++                continue;
++            }
++            if (!vIndex.containsKey(successor)) {
++                getSCCs(startIndex, successorIndex);
++                vLowlink.put(vertex, Math.min(vLowlink.get(vertex), vLowlink.get(successor)));
++            } else if (pathSet.contains(successor)) {
++                vLowlink.put(vertex, Math.min(vLowlink.get(vertex), vIndex.get(successor)));
++            }
++        }
++        if (vLowlink.get(vertex).equals(vIndex.get(vertex))) {
++            Set<V> result = new HashSet<>();
++            V temp;
++            do {
++                temp = path.pop();
++                pathSet.remove(temp);
++                result.add(temp);
++            } while (!vertex.equals(temp));
++            if (result.size() == 1) {
++                V v = result.iterator().next();
++                if (graph.edges().contains(vertex)) {
++                    foundSCCs.add(result);
++                }
++            } else {
++                foundSCCs.add(result);
++            }
++        }
++    }
++
++    private boolean findCyclesInSCG(int startIndex, int vertexIndex, Graph<V> scg)
++    {
++        /*
++         * Find cycles in a strongly connected graph per Johnson.
++         */
++        boolean foundCycle = false;
++        V vertex = toV(vertexIndex);
++        stack.push(vertex);
++        blocked.add(vertex);
++
++        for (V successor : scg.successors(vertex)) {
++            int successorIndex = toI(successor);
++            if (successorIndex == startIndex) {
++                List<V> cycle = new ArrayList<>(stack.size());
++                stack.descendingIterator().forEachRemaining(cycle::add);
++                cycleConsumer.accept(cycle);
++                foundCycle = true;
++            } else if (!blocked.contains(successor)) {
++                boolean gotCycle = findCyclesInSCG(startIndex, successorIndex, scg);
++                foundCycle = foundCycle || gotCycle;
++            }
++        }
++        if (foundCycle) {
++            unblock(vertex);
++        } else {
++            for (V w : scg.successors(vertex)) {
++                Set<V> bSet = getBSet(w);
++                bSet.add(vertex);
++            }
++        }
++        stack.pop();
++        return foundCycle;
++    }
++
++    private void unblock(V vertex)
++    {
++        blocked.remove(vertex);
++        Set<V> bSet = getBSet(vertex);
++        while (bSet.size() > 0) {
++            V w = bSet.iterator().next();
++            bSet.remove(w);
++            if (blocked.contains(w)) {
++                unblock(w);
++            }
++        }
++    }
++
++    @SuppressWarnings("unchecked")
++    private void initState(Consumer<List<V>> consumer)
++    {
++        cycleConsumer = consumer;
++        iToV = (V[]) graph.nodes().toArray();
++        vToI = new HashMap<>();
++        blocked = new HashSet<>();
++        bSets = new HashMap<>();
++        stack = new ArrayDeque<>();
++
++        for (int i = 0; i < iToV.length; i++) {
++            vToI.put(iToV[i], i);
++        }
++    }
++
++    private void clearState()
++    {
++        cycleConsumer = null;
++        iToV = null;
++        vToI = null;
++        blocked = null;
++        bSets = null;
++        stack = null;
++    }
++
++    private void initMinSCGState()
++    {
++        index = 0;
++        foundSCCs = new ArrayList<>();
++        vIndex = new HashMap<>();
++        vLowlink = new HashMap<>();
++        path = new ArrayDeque<>();
++        pathSet = new HashSet<>();
++    }
++
++    private void clearMinSCCState()
++    {
++        index = 0;
++        foundSCCs = null;
++        vIndex = null;
++        vLowlink = null;
++        path = null;
++        pathSet = null;
++    }
++
++    private Integer toI(V vertex)
++    {
++        return vToI.get(vertex);
++    }
++
++    private V toV(Integer i)
++    {
++        return iToV[i];
++    }
++
++    private Set<V> getBSet(V v)
++    {
++        // B sets typically not all needed,
++        // so instantiate lazily.
++        return bSets.computeIfAbsent(v, k -> new HashSet<>());
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/LegacyPluginLoadingStrategy.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/LegacyPluginLoadingStrategy.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..720893d852ff1971f5719e67e360f13634a74d2b
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/LegacyPluginLoadingStrategy.java
+@@ -0,0 +1,247 @@
++package io.papermc.paper.plugin.provider.service.storage.plugin.strategy.impl;
++
++import com.google.common.graph.GraphBuilder;
++import com.google.common.graph.MutableGraph;
++import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.provider.service.storage.plugin.strategy.PluginLoadingStrategy;
++import org.bukkit.plugin.UnknownDependencyException;
++import org.bukkit.plugin.java.JavaPlugin;
++
++import java.util.Collection;
++import java.util.HashMap;
++import java.util.HashSet;
++import java.util.Iterator;
++import java.util.LinkedList;
++import java.util.List;
++import java.util.Map;
++import java.util.Set;
++import java.util.logging.Level;
++import java.util.logging.Logger;
++
++public class LegacyPluginLoadingStrategy implements PluginLoadingStrategy {
++
++    private static final Logger LOGGER = Logger.getLogger("LegacyPluginLoadingStrategy");
++    public static final LegacyPluginLoadingStrategy INSTANCE = new LegacyPluginLoadingStrategy();
++
++    @Override
++    public void loadPlugins(List<PluginProvider<JavaPlugin>> providers) {
++        MutableGraph<String> dependencyGraph = GraphBuilder.directed().build();
++
++        Map<String, PluginProvider<JavaPlugin>> providersToLoad = new HashMap<>();
++        Set<String> loadedPlugins = new HashSet<>();
++        Map<String, String> pluginsProvided = new HashMap<>();
++        Map<String, Collection<String>> dependencies = new HashMap<>();
++        Map<String, Collection<String>> softDependencies = new HashMap<>();
++
++        for (PluginProvider<JavaPlugin> provider : providers) {
++            PluginConfiguration configuration = provider.getConfiguration();
++
++            PluginProvider<JavaPlugin> replacedProvider = providersToLoad.put(configuration.getIdentifier(), provider);
++            if (replacedProvider != null) {
++                LOGGER.severe(String.format(
++                    "Ambiguous plugin name `%s' for files `%s' and `%s' in `%s'",
++                    configuration.getIdentifier(),
++                    provider.getSource(),
++                    replacedProvider.getSource(),
++                    replacedProvider.getParentSource()
++                ));
++            }
++
++            String removedProvided = pluginsProvided.remove(configuration.getIdentifier());
++            if (removedProvided != null) {
++                LOGGER.warning(String.format(
++                    "Ambiguous plugin name `%s'. It is also provided by `%s'",
++                    configuration.getIdentifier(),
++                    removedProvided
++                ));
++            }
++
++            for (String provided : configuration.getProvides()) {
++                PluginProvider<JavaPlugin> pluginProvider = providersToLoad.get(provided);
++
++                if (pluginProvider != null) {
++                    LOGGER.warning(String.format(
++                        "`%s provides `%s' while this is also the name of `%s' in `%s'",
++                        provider.getSource(),
++                        provided,
++                        pluginProvider.getSource(),
++                        provider.getParentSource()
++                    ));
++                } else {
++                    String replacedPlugin = pluginsProvided.put(provided, configuration.getIdentifier());
++                    if (replacedPlugin != null) {
++                        LOGGER.warning(String.format(
++                            "`%s' is provided by both `%s' and `%s'",
++                            provided,
++                            configuration.getIdentifier(),
++                            replacedPlugin
++                        ));
++                    }
++                }
++            }
++
++            Collection<String> softDependencySet = configuration.getSoftDependencies();
++            if (softDependencySet != null && !softDependencySet.isEmpty()) {
++                if (softDependencies.containsKey(configuration.getIdentifier())) {
++                    // Duplicates do not matter, they will be removed together if applicable
++                    softDependencies.get(configuration.getIdentifier()).addAll(softDependencySet);
++                } else {
++                    softDependencies.put(configuration.getIdentifier(), new LinkedList<String>(softDependencySet));
++                }
++
++                for (String depend : softDependencySet) {
++                    dependencyGraph.putEdge(configuration.getIdentifier(), depend);
++                }
++            }
++
++            Collection<String> dependencySet = configuration.getHardDependencies();
++            if (dependencySet != null && !dependencySet.isEmpty()) {
++                dependencies.put(configuration.getIdentifier(), new LinkedList<String>(dependencySet));
++
++                for (String depend : dependencySet) {
++                    dependencyGraph.putEdge(configuration.getIdentifier(), depend);
++                }
++            }
++
++            Collection<String> loadBeforeSet = configuration.getLoadBefore();
++            if (loadBeforeSet != null && !loadBeforeSet.isEmpty()) {
++                for (String loadBeforeTarget : loadBeforeSet) {
++                    if (softDependencies.containsKey(loadBeforeTarget)) {
++                        softDependencies.get(loadBeforeTarget).add(configuration.getIdentifier());
++                    } else {
++                        // softDependencies is never iterated, so 'ghost' plugins aren't an issue
++                        Collection<String> shortSoftDependency = new LinkedList<String>();
++                        shortSoftDependency.add(configuration.getIdentifier());
++                        softDependencies.put(loadBeforeTarget, shortSoftDependency);
++                    }
++
++                    dependencyGraph.putEdge(loadBeforeTarget, configuration.getIdentifier());
++                }
++            }
++        }
++
++        while (!providersToLoad.isEmpty()) {
++            boolean missingDependency = true;
++            Iterator<Map.Entry<String, PluginProvider<JavaPlugin>>> providerIterator = providersToLoad.entrySet().iterator();
++
++            while (providerIterator.hasNext()) {
++                Map.Entry<String, PluginProvider<JavaPlugin>> entry = providerIterator.next();
++                String providerIdentifier = entry.getKey();
++
++                if (dependencies.containsKey(providerIdentifier)) {
++                    Iterator<String> dependencyIterator = dependencies.get(providerIdentifier).iterator();
++                    final Set<String> missingHardDependencies = new HashSet<>(dependencies.get(providerIdentifier).size()); // Paper - list all missing hard depends
++
++                    while (dependencyIterator.hasNext()) {
++                        String dependency = dependencyIterator.next();
++
++                        // Dependency loaded
++                        if (loadedPlugins.contains(dependency)) {
++                            dependencyIterator.remove();
++
++                            // We have a dependency not found
++                        } else if (!providersToLoad.containsKey(dependency) && !pluginsProvided.containsKey(dependency)) {
++                            // Paper start
++                            missingHardDependencies.add(dependency);
++                        }
++                    }
++                    if (!missingHardDependencies.isEmpty()) {
++                        // Paper end
++                        missingDependency = false;
++                        providerIterator.remove();
++                        pluginsProvided.values().removeIf(s -> s.equals(providerIdentifier)); // Paper - remove provided plugins
++                        softDependencies.remove(providerIdentifier);
++                        dependencies.remove(providerIdentifier);
++
++                        LOGGER.log(
++                            Level.SEVERE,
++                            "Could not load '" + entry.getValue().getSource() + "' in folder '" + entry.getValue().getParentSource() + "'", // Paper
++                            new UnknownDependencyException(missingHardDependencies, providerIdentifier)); // Paper
++                    }
++
++                    if (dependencies.containsKey(providerIdentifier) && dependencies.get(providerIdentifier).isEmpty()) {
++                        dependencies.remove(providerIdentifier);
++                    }
++                }
++                if (softDependencies.containsKey(providerIdentifier)) {
++                    Iterator<String> softDependencyIterator = softDependencies.get(providerIdentifier).iterator();
++
++                    while (softDependencyIterator.hasNext()) {
++                        String softDependency = softDependencyIterator.next();
++
++                        // Soft depend is no longer around
++                        if (!providersToLoad.containsKey(softDependency) && !pluginsProvided.containsKey(softDependency)) {
++                            softDependencyIterator.remove();
++                        }
++                    }
++
++                    if (softDependencies.get(providerIdentifier).isEmpty()) {
++                        softDependencies.remove(providerIdentifier);
++                    }
++                }
++                if (!(dependencies.containsKey(providerIdentifier) || softDependencies.containsKey(providerIdentifier)) && providersToLoad.containsKey(providerIdentifier)) {
++                    // We're clear to load, no more soft or hard dependencies left
++                    PluginProvider<JavaPlugin> file = providersToLoad.get(providerIdentifier);
++                    providerIterator.remove();
++                    pluginsProvided.values().removeIf(s -> s.equals(providerIdentifier)); // Paper - remove provided plugins
++                    missingDependency = false;
++
++                    try {
++                        JavaPlugin loadedPlugin = file.createInstance();
++
++                        LOGGER.info(String.format("Loading server plugin %s", file.getConfiguration().getDisplayName()));
++                        loadedPlugins.add(loadedPlugin.getConfiguration().getIdentifier());
++                        loadedPlugins.addAll(loadedPlugin.getDescription().getProvides());
++                        loadedPlugin.onLoad();
++                        continue;
++                    } catch (Exception ex) {
++                        LOGGER.log(Level.SEVERE, "Could not load '" + file.getSource() + "' in folder '" + file.getParentSource() + "'", ex); // Paper
++                    }
++                }
++            }
++
++            if (missingDependency) {
++                // We now iterate over plugins until something loads
++                // This loop will ignore soft dependencies
++                providerIterator = providersToLoad.entrySet().iterator();
++
++                while (providerIterator.hasNext()) {
++                    Map.Entry<String, PluginProvider<JavaPlugin>> entry = providerIterator.next();
++                    String plugin = entry.getKey();
++
++                    if (!dependencies.containsKey(plugin)) {
++                        softDependencies.remove(plugin);
++                        missingDependency = false;
++                        PluginProvider<JavaPlugin> file = entry.getValue();
++                        providerIterator.remove();
++
++                        try {
++                            JavaPlugin loadedPlugin = file.createInstance();
++
++                            LOGGER.info(String.format("Loading server plugin %s", file.getConfiguration().getDisplayName()));
++                            loadedPlugins.add(loadedPlugin.getConfiguration().getIdentifier());
++                            loadedPlugins.addAll(loadedPlugin.getDescription().getProvides());
++                            loadedPlugin.onLoad();
++                            break;
++                        } catch (Exception ex) {
++                            LOGGER.log(Level.SEVERE, "Could not load '" + file.getSource() + "' in folder '" + file.getParentSource() + "'", ex); // Paper
++                        }
++                    }
++                }
++                // We have no plugins left without a depend
++                if (missingDependency) {
++                    softDependencies.clear();
++                    dependencies.clear();
++                    Iterator<PluginProvider<JavaPlugin>> failedPluginIterator = providersToLoad.values().iterator();
++
++                    while (failedPluginIterator.hasNext()) {
++                        PluginProvider<JavaPlugin> file = failedPluginIterator.next();
++                        failedPluginIterator.remove();
++                        LOGGER.log(Level.SEVERE, "Could not load '" + file.getSource() + "' in folder '" + file.getParentSource() + "': circular dependency detected"); // Paper
++                    }
++                }
++            }
++        }
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/ModernPluginLoadingStrategy.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/ModernPluginLoadingStrategy.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..747513aeb99875cda1d17001e3a468fb8eedbf99
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/ModernPluginLoadingStrategy.java
+@@ -0,0 +1,135 @@
++package io.papermc.paper.plugin.provider.service.storage.plugin.strategy.impl;
++
++import com.google.common.collect.Lists;
++import com.google.common.graph.GraphBuilder;
++import com.google.common.graph.MutableGraph;
++import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.provider.service.storage.plugin.strategy.PluginLoadingStrategy;
++import org.bukkit.plugin.UnknownDependencyException;
++import org.bukkit.plugin.java.JavaPlugin;
++
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.logging.Level;
++import java.util.logging.Logger;
++
++public class ModernPluginLoadingStrategy implements PluginLoadingStrategy {
++
++    private static final Logger LOGGER = Logger.getLogger("ModernPluginLoadingStrategy");
++    public static final ModernPluginLoadingStrategy INSTANCE = new ModernPluginLoadingStrategy();
++
++    @Override
++    public void loadPlugins(List<PluginProvider<JavaPlugin>> plugins) {
++        // Dependency validation
++        List<PluginProvider<JavaPlugin>> validatedProviders = new ArrayList<>();
++        Map<String, PluginProvider<JavaPlugin>> providerMap = new HashMap<>();
++        {
++            // Populate dependency set
++            for (PluginProvider<JavaPlugin> provider : plugins) {
++                PluginConfiguration providerConfig = provider.getConfiguration();
++
++                // Populate provided into a map
++                providerMap.put(providerConfig.getIdentifier(), provider);
++                for (String provides : providerConfig.getProvides()) {
++                    providerMap.put(provides, provider);
++                }
++            }
++
++            // Validate
++            for (PluginProvider<JavaPlugin> provider : plugins) {
++                PluginConfiguration providerConfiguration = provider.getConfiguration();
++
++                // Populate missing dependencies to capture if there are multiple missing ones.
++                List<String> missingDependencies = new ArrayList<>();
++                for (String hardDependency : providerConfiguration.getHardDependencies()) {
++                    if (!providerMap.containsKey(hardDependency)) {
++                        missingDependencies.add(hardDependency);
++                    }
++                }
++
++                if (missingDependencies.isEmpty()) {
++                    validatedProviders.add(provider);
++                } else {
++                    LOGGER.log(
++                        Level.SEVERE,
++                        "Could not load '%s' in '%s'".formatted(provider.getSource(), provider.getParentSource()),
++                        new UnknownDependencyException(missingDependencies, providerConfiguration.getIdentifier())); // Paper
++                }
++            }
++        }
++
++        MutableGraph<String> dependencyGraph = GraphBuilder.directed().build();
++        // Build dependency graph
++        // Build the dependencies inorder to generate a load order by topographically sorting the populated graph
++        for (PluginProvider<?> provider : validatedProviders) {
++            PluginConfiguration configuration = provider.getConfiguration();
++            String dependencyIdentifier = configuration.getIdentifier();
++
++            for (String dependency : configuration.getHardDependencies()) {
++                dependencyGraph.putEdge(dependencyIdentifier, dependency);
++            }
++
++            for (String loadBeforeTarget : configuration.getLoadBefore()) {
++                dependencyGraph.putEdge(loadBeforeTarget, dependencyIdentifier);
++            }
++
++            // Some plugins (notably GriefPrevention) have a dependency in both load before & soft depends
++            // For now, at least, properly handle this.
++            for (String dependency : configuration.getSoftDependencies()) {
++                dependencyGraph.putEdge(dependencyIdentifier, dependency);
++            }
++
++        }
++
++        // Reverse the topographic search to let us see which providers we can load first.
++        List<String> reversedTopographicSort;
++        try {
++            reversedTopographicSort = Lists.reverse(TopographicGraphSorter.sortGraph(dependencyGraph));
++        } catch (GraphCycleException e) {
++            List<String> logMessages = new ArrayList<>();
++            for (List<String> list : new JohnsonSimpleCycles<>(dependencyGraph).findSimpleCycles()) {
++                // CoolPlugin depends on Dependency depends on CoolPlugin...
++                for (int i = 0; i < list.size(); i++) {
++                    String dependency = list.get(0);
++                    if (providerMap.containsKey(dependency)) {
++                        list.set(0, "[PLUGIN] " + dependency);
++                    }
++
++                }
++                logMessages.add(String.join(" depends on ", list) + " depends on " + list.get(0) + "...");
++            }
++
++            LOGGER.log(Level.SEVERE, "Circular dependencies detected!");
++            LOGGER.log(Level.SEVERE, "You have a plugin that is depending on a plugin which refers back to that plugin. Your server will shut down until these are resolved, or the strategy is changed.");
++            LOGGER.log(Level.SEVERE, "Circular dependencies:");
++            for (String message : logMessages) {
++                LOGGER.log(Level.SEVERE, message);
++            }
++            LOGGER.log(Level.SEVERE, "If you would like to still load these plugins, acknowledging that there may be unexpected plugin loading issues, change plugin-loading-strategy in paper-global.yml to LEGACY.");
++
++            System.exit(-1);
++            return;
++        }
++
++        for (String providerIdentifier : reversedTopographicSort) {
++            // It's possible that this will be null because the above dependencies for soft/load before aren't validated if they exist.
++            // The graph could be MutableGraph<PluginProvider<JavaPlugin>>, but we would have to check if each dependency exists there... just
++            // nicer to do it here TBH.
++            PluginProvider<JavaPlugin> retrievedProvider = providerMap.get(providerIdentifier);
++            if (retrievedProvider == null) {
++                continue; // Skip provider that doesn't exist....
++            }
++
++            try {
++                JavaPlugin plugin = retrievedProvider.createInstance();
++                plugin.getLogger().info(String.format("Loading server plugin %s", plugin.getConfiguration().getDisplayName()));
++                plugin.onLoad();
++            } catch (Throwable ex) {
++                LOGGER.log(Level.WARNING, "Could not load server plugin '%s' in folder '%s' (Is it up to date?)".formatted(retrievedProvider.getFileName(), retrievedProvider.getParentSource()), ex);
++            }
++        }
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/TopographicGraphSorter.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/TopographicGraphSorter.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..c10f28243b33a2737d4394df15b7a94978e06a50
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/TopographicGraphSorter.java
+@@ -0,0 +1,58 @@
++package io.papermc.paper.plugin.provider.service.storage.plugin.strategy.impl;
++
++import com.google.common.graph.Graph;
++
++import java.util.ArrayDeque;
++import java.util.ArrayList;
++import java.util.Deque;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.Set;
++
++public class TopographicGraphSorter {
++
++    // Topographically sort dependencies
++    public static <N> List<N> sortGraph(Graph<N> graph) throws GraphCycleException {
++        List<N> sorted = new ArrayList<>();
++        Deque<N> roots = new ArrayDeque<>();
++        Map<N, Integer> nonRoots = new HashMap<>();
++
++        for (N node : graph.nodes()) {
++            // Is a node being referred to by any other nodes?
++            int degree = graph.inDegree(node);
++            if (degree == 0) {
++                // Is a root
++                roots.add(node);
++            } else {
++                // Isn't a root, the number represents how many nodes connect to it.
++                nonRoots.put(node, degree);
++            }
++        }
++
++        // Pick from nodes that aren't referred to anywhere else
++        while (!roots.isEmpty()) {
++            N next = roots.remove();
++
++            for (N successor : graph.successors(next)) {
++                // Traverse through, moving down a degree
++                int newInDegree = nonRoots.get(successor) - 1;
++
++                if (newInDegree == 0) {
++                    nonRoots.remove(successor);
++                    roots.add(successor);
++                } else {
++                    nonRoots.put(successor, newInDegree);
++                }
++
++            }
++            sorted.add(next);
++        }
++
++        if (!nonRoots.isEmpty()) {
++            throw new GraphCycleException();
++        }
++
++        return sorted;
++    }
++}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/JavaPluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/type/JavaPluginProvider.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..c7b16e25a140e51ef4dfbba3d036acf68dfb88b5
@@ -849,7 +1717,7 @@ index 0000000000000000000000000000000000000000..c7b16e25a140e51ef4dfbba3d036acf6
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java b/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..302a884d0b4b02c4bb6079be363202fe9a2d8c83
+index 0000000000000000000000000000000000000000..425c7c3dac2d607dd24b572d0b4338a7c652c672
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java
 @@ -0,0 +1,65 @@
@@ -857,7 +1725,7 @@ index 0000000000000000000000000000000000000000..302a884d0b4b02c4bb6079be363202fe
 +
 +import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
 +import io.papermc.paper.plugin.provider.service.storage.PreInitProviderStorage;
-+import io.papermc.paper.plugin.provider.service.storage.ServerPluginProviderStorage;
++import io.papermc.paper.plugin.provider.service.storage.plugin.ServerPluginProviderStorage;
 +import io.papermc.paper.plugin.provider.type.paper.PaperPluginParentProvider;
 +import io.papermc.paper.plugin.provider.type.paper.PaperPluginProvider;
 +import io.papermc.paper.plugin.provider.type.spigot.SpigotPluginProvider;
@@ -1423,7 +2291,7 @@ index 0a843e0afbcb1af8e2641515eb244b791b819b8c..61c9b66079feddd42704be20032fc869
              Util.startTimerHackThread();
              Path path = Paths.get("server.properties");
 diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..c0b2dc3c112d4692d001ee042326baea40a157a6 100644
+index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..ba5180b6fdee2819fdf001be537d83d18b0834db 100644
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 @@ -410,7 +410,8 @@ public final class CraftServer implements Server {
@@ -1431,7 +2299,7 @@ index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..c0b2dc3c112d4692d001ee042326baea
      public void loadPlugins() {
          this.pluginManager.registerInterface(JavaPluginLoader.class);
 -
-+        io.papermc.paper.plugin.provider.service.storage.ServerPluginProviderStorage.INSTANCE.loadAll();
++        io.papermc.paper.plugin.provider.service.storage.plugin.ServerPluginProviderStorage.INSTANCE.loadAll();
 +        if (true) return;
          File pluginFolder = this.getPluginsFolder(); // Paper
  

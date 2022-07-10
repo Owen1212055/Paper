@@ -88,10 +88,10 @@ index 0000000000000000000000000000000000000000..49f679d209aee307767f956916001f8b
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..35fc4d4f7cbf90e90115658c21ac0faf7e9c86f2
+index 0000000000000000000000000000000000000000..687d9b7819e8d0922298335aab64aeb025d70208
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,37 @@
 +package io.papermc.paper.plugin.provider;
 +
 +import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
@@ -111,6 +111,14 @@ index 0000000000000000000000000000000000000000..35fc4d4f7cbf90e90115658c21ac0faf
 +
 +    @NotNull
 +    Path getSource();
++
++    default Path getFileName() {
++        return this.getSource().getFileName();
++    }
++
++    default Path getParentSource() {
++        return this.getSource().getParent();
++    }
 +
 +    JarFile file();
 +
@@ -1027,7 +1035,7 @@ index 0c9f4d1e9104fa6951114c1f9ec954dfcc749196..f6193c406ee7ba6b7ed66d1aca20da35
 +    // Paper end
  }
 diff --git a/src/main/java/org/bukkit/plugin/SimplePluginManager.java b/src/main/java/org/bukkit/plugin/SimplePluginManager.java
-index ed07f5820281b139739f673fa4e25171de81b894..30a570424743b279931de1c0ba29cf94b47b2c01 100644
+index ed07f5820281b139739f673fa4e25171de81b894..bf59c122e965224b3539cfbdcdac09a043b28a7b 100644
 --- a/src/main/java/org/bukkit/plugin/SimplePluginManager.java
 +++ b/src/main/java/org/bukkit/plugin/SimplePluginManager.java
 @@ -55,6 +55,8 @@ public final class SimplePluginManager implements PluginManager {
@@ -1060,13 +1068,12 @@ index ed07f5820281b139739f673fa4e25171de81b894..30a570424743b279931de1c0ba29cf94
          if (result != null) {
              plugins.add(result);
              lookupNames.put(result.getDescription().getName().toLowerCase(java.util.Locale.ENGLISH), result); // Paper
-@@ -924,12 +931,19 @@ public final class SimplePluginManager implements PluginManager {
+@@ -923,13 +930,17 @@ public final class SimplePluginManager implements PluginManager {
+         return new HashSet<Permission>(permissions.values());
      }
  
-     public boolean isTransitiveDepend(@NotNull PluginDescriptionFile plugin, @NotNull PluginDescriptionFile depend) {
+-    public boolean isTransitiveDepend(@NotNull PluginDescriptionFile plugin, @NotNull PluginDescriptionFile depend) {
 +    // Paper start
-+        return this.isTransitiveDepend(plugin, depend); // TODO: DO I need this? I don't wanna yuck the signature
-+    }
 +    public boolean isTransitiveDepend(@NotNull io.papermc.paper.plugin.provider.configuration.PluginConfiguration plugin, @NotNull io.papermc.paper.plugin.provider.configuration.PluginConfiguration depend) {
 +    // Paper end
          Preconditions.checkArgument(plugin != null, "plugin");

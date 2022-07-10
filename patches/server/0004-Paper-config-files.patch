@@ -434,12 +434,13 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..84785fed0d85d78c4caf8fabe35c0e89a59240d5
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/configuration/GlobalConfiguration.java
-@@ -0,0 +1,275 @@
+@@ -0,0 +1,267 @@
 +package io.papermc.paper.configuration;
 +
 +import co.aikar.timings.MinecraftTimings;
 +import io.papermc.paper.configuration.constraint.Constraint;
 +import io.papermc.paper.configuration.constraint.Constraints;
++import io.papermc.paper.plugin.provider.service.storage.plugin.strategy.impl.PluginLoadingStrategies;
 +import net.kyori.adventure.text.Component;
 +import net.kyori.adventure.text.format.NamedTextColor;
 +import net.minecraft.network.protocol.Packet;
@@ -705,6 +706,7 @@ index 0000000000000000000000000000000000000000..84785fed0d85d78c4caf8fabe35c0e89
 +        public int regionFileCacheSize = 256;
 +        @Comment("See https://luckformula.emc.gs")
 +        public boolean useAlternativeLuckFormula = false;
++        public PluginLoadingStrategies pluginLoadingStrategy = PluginLoadingStrategies.MODERN;
 +        public boolean lagCompensateBlockBreaking = true;
 +        public boolean useDimensionTypeForCustomSpawners = false;
 +        public boolean strictAdvancementDimensionCheck = false;
@@ -4285,6 +4287,27 @@ index 0000000000000000000000000000000000000000..70cc7b45e7355f6c8476a74a070f1266
 +    static OptionalInt negToDef(int value) {
 +        return value < 0 ?  OptionalInt.empty() : OptionalInt.of(value);
 +    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/PluginLoadingStrategies.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/PluginLoadingStrategies.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..04db26520c87173e7bcc2d8408eec8ea7769eaa9
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/PluginLoadingStrategies.java
+@@ -0,0 +1,15 @@
++package io.papermc.paper.plugin.provider.service.storage.plugin.strategy.impl;
++
++public enum PluginLoadingStrategies {
++
++    /**
++     * Handles cyclical dependencies in an arbitrary way for softdepends/loadbefore.
++     * This causes issues in certain unknown cases: https://github.com/PaperMC/Paper/issues/5992
++     */
++    LEGACY,
++
++    /**
++     * Does not allow cyclical dependencies, much cleaner and simpler loading behavior.
++     */
++    MODERN;
 +}
 diff --git a/src/main/java/net/minecraft/server/Main.java b/src/main/java/net/minecraft/server/Main.java
 index 23e60283a6c99dde5fbb142da678f6569d163c97..4dd3af1416cbdad330365a19ad664079f3598c15 100644
