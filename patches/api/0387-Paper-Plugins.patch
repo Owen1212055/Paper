@@ -88,7 +88,7 @@ index 0000000000000000000000000000000000000000..49f679d209aee307767f956916001f8b
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..687d9b7819e8d0922298335aab64aeb025d70208
+index 0000000000000000000000000000000000000000..0b588b712ea9905268012a3c21fc2ae3a99fdf70
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
 @@ -0,0 +1,37 @@
@@ -97,10 +97,10 @@ index 0000000000000000000000000000000000000000..687d9b7819e8d0922298335aab64aeb0
 +import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
 +import org.jetbrains.annotations.ApiStatus;
 +import org.jetbrains.annotations.NotNull;
-+import org.slf4j.Logger;
 +
 +import java.nio.file.Path;
 +import java.util.jar.JarFile;
++import java.util.logging.Logger;
 +
 +/*
 +Plugin providers are meant to be the initial pre-loading stage of a plugin.
@@ -494,10 +494,10 @@ index 0000000000000000000000000000000000000000..94098da7c38678f4a2069dd47f80bbde
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..e51d34c3ed4beda246bafe302e0fe8d84fb18870
+index 0000000000000000000000000000000000000000..8417f3e5ffd15ea5da04f4144f1993bd68dc5954
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,261 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
 +import com.google.common.io.ByteStreams;
@@ -529,6 +529,7 @@ index 0000000000000000000000000000000000000000..e51d34c3ed4beda246bafe302e0fe8d8
 +import java.util.jar.JarEntry;
 +import java.util.jar.JarFile;
 +import java.util.jar.Manifest;
++import java.util.logging.Logger;
 +
 +public class PaperPluginClassLoader extends URLClassLoader {
 +
@@ -543,7 +544,7 @@ index 0000000000000000000000000000000000000000..e51d34c3ed4beda246bafe302e0fe8d8
 +    private final URL jarUrl;
 +
 +    private final Set<String> seenIllegalAccess = Collections.newSetFromMap(new ConcurrentHashMap<>());
-+    private final org.slf4j.Logger logger;
++    private final Logger logger;
 +
 +    static {
 +        ClassLoader.registerAsParallelCapable();
@@ -610,7 +611,7 @@ index 0000000000000000000000000000000000000000..e51d34c3ed4beda246bafe302e0fe8d8
 +                    if (classLoaderConfig != this.pluginConfiguration && !this.seenIllegalAccess.contains(identifier) && !this.pluginConfiguration.isTransitiveDependency(classLoaderConfig)) {
 +                        this.seenIllegalAccess.add(identifier);
 +                        if (this.pluginProvider != null) {
-+                            this.logger.warn("Loaded class {} from {} which is not a depend or softdepend of this plugin.", name, classLoaderConfig.getDisplayName());
++                            this.logger.warning("Loaded class '%s' from '%s' which is not a depend or softdepend of this plugin.".formatted(name, classLoaderConfig.getDisplayName()));
 +                        }
 +                    }
 +                }
