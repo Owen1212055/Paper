@@ -17,7 +17,7 @@ index 37d28625b9528bbe0cd6d9623e702bbbc2b07883..ab9a00b60eed9da7e61feda90a69563a
  }
 diff --git a/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java b/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..434cdcaed998c469b9ce9207d3a4681437cb632c
+index 0000000000000000000000000000000000000000..11a757660d6b5091faaa0e8ab6e2988b7d1376ce
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java
 @@ -0,0 +1,217 @@
@@ -155,8 +155,8 @@ index 0000000000000000000000000000000000000000..434cdcaed998c469b9ce9207d3a46814
 +
 +    private static <T> List<Component> formatProviders(TreeMap<String, PluginProvider<T>> plugins) {
 +        List<Component> components = new ArrayList<>(plugins.size());
-+        for (Map.Entry<String, PluginProvider<T>> entry : plugins.entrySet()) {
-+            components.add(formatProvider(entry.getValue()));
++        for (PluginProvider<T> entry : plugins.values()) {
++            components.add(formatProvider(entry));
 +        }
 +
 +        boolean isFirst = true;
@@ -268,20 +268,60 @@ index 0000000000000000000000000000000000000000..94023e8b7f5011d4962e7859dd8771ab
 +
 +    void setStatus(ProviderStatus status);
 +}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/FlattenedResolver.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/FlattenedResolver.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ba3bcc468c0a60c76d6d0f0243bda661c737f2f
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/FlattenedResolver.java
+@@ -0,0 +1,29 @@
++package io.papermc.paper.plugin.provider.configuration;
++
++import org.checkerframework.checker.nullness.qual.Nullable;
++import org.spongepowered.configurate.objectmapping.meta.NodeResolver;
++
++import java.lang.annotation.ElementType;
++import java.lang.annotation.Retention;
++import java.lang.annotation.RetentionPolicy;
++import java.lang.annotation.Target;
++import java.lang.reflect.AnnotatedElement;
++
++@Retention(RetentionPolicy.RUNTIME)
++@Target(ElementType.FIELD)
++public @interface FlattenedResolver {
++
++    final class Factory implements NodeResolver.Factory {
++
++        @Override
++        public @Nullable NodeResolver make(String name, AnnotatedElement element) {
++            if (element.isAnnotationPresent(FlattenedResolver.class)) {
++                return (node) -> node;
++            } else {
++                return null;
++            }
++        }
++    }
++
++
++}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..dbd8c29ce95bdb36af4b897f5b476b83a72626a6
+index 0000000000000000000000000000000000000000..213ab9e6a4d1041ec8f29423d246e8b3aaf1a54a
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
-@@ -0,0 +1,198 @@
+@@ -0,0 +1,208 @@
 +package io.papermc.paper.plugin.provider.configuration;
 +
 +import com.google.common.collect.ImmutableList;
++import io.leangen.geantyref.TypeToken;
 +import io.papermc.paper.configuration.constraint.Constraint;
 +import io.papermc.paper.configuration.serializer.EnumValueSerializer;
 +import io.papermc.paper.configuration.serializer.collections.MapSerializer;
++import io.papermc.paper.plugin.provider.configuration.serializer.ImmutableListSerializer;
++import io.papermc.paper.plugin.provider.configuration.serializer.PermissionConfigurationSerializer;
 +import io.papermc.paper.plugin.provider.configuration.serializer.constraints.PluginConfigConstraints;
 +import io.papermc.paper.plugin.provider.configuration.type.PaperCommandMap;
++import io.papermc.paper.plugin.provider.configuration.type.PermissionConfiguration;
++import org.bukkit.permissions.Permission;
 +import org.bukkit.permissions.PermissionDefault;
 +import org.bukkit.plugin.PluginLoadOrder;
 +import org.spongepowered.configurate.CommentedConfigurationNode;
@@ -294,7 +334,6 @@ index 0000000000000000000000000000000000000000..dbd8c29ce95bdb36af4b897f5b476b83
 +import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 +
 +import java.io.BufferedReader;
-+import java.util.ArrayList;
 +import java.util.List;
 +import java.util.Map;
 +
@@ -312,26 +351,23 @@ index 0000000000000000000000000000000000000000..dbd8c29ce95bdb36af4b897f5b476b83
 +    private String boostrapper = null;
 +    @PluginConfigConstraints.PluginNameSpace
 +    private String loader = null;
-+    private String classLoaderOf = null;
 +    private List<String> depend = List.of();
 +    private List<String> softDepend = List.of();
 +    private List<String> loadBefore = List.of();
 +    @Required
 +    private String version = null;
-+    private PaperCommandMap commandMap = new PaperCommandMap();
++    private PaperCommandMap commandMap = new PaperCommandMap(Map.of());
 +    private String description = null;
 +    private List<String> authors = List.of();
 +    private List<String> contributors = List.of();
 +    private String website = null;
 +    private String prefix = null;
 +    private PluginLoadOrder load = PluginLoadOrder.POSTWORLD;
-+    //private List<Permission> permissions = null;
-+    //private Map<?, ?> lazyPermissions = null;
-+    private PermissionDefault defaultPerm = PermissionDefault.OP;
-+    //private Set<PluginAwareness> awareness = ImmutableSet.of();
++    @FlattenedResolver
++    private PermissionConfiguration permissionConfiguration = new PermissionConfiguration(PermissionDefault.OP, List.of());
 +    private String apiVersion = null;
 +
-+    private List<String> libraries = ImmutableList.of();
++    private transient String displayName;
 +
 +    public static PaperPluginConfiguration create(BufferedReader reader) throws ConfigurateException {
 +        YamlConfigurationLoader loader = YamlConfigurationLoader.builder()
@@ -340,16 +376,22 @@ index 0000000000000000000000000000000000000000..dbd8c29ce95bdb36af4b897f5b476b83
 +            .headerMode(HeaderMode.NONE)
 +            .source(() -> reader)
 +            .defaultOptions((options) -> {
++
 +                return options.serializers((serializers) -> {
 +                    serializers
 +                        .register(new EnumValueSerializer())
 +                        .register(PaperCommandMap.SERIALIZER)
 +                        .register(MapSerializer.TYPE, new MapSerializer(false))
++                        .register(new TypeToken<List<?>>() {}, new ImmutableListSerializer())
++                        .register(PermissionConfiguration.class, PermissionConfigurationSerializer.SERIALIZER)
 +                        .registerAnnotatedObjects(
 +                            ObjectMapper.factoryBuilder()
 +                                .addConstraint(Constraint.class, new Constraint.Factory())
-+                                .addConstraint(PluginConfigConstraints.PluginName.class, String.class, new PluginConfigConstraints.PluginName.Factory()).build()
++                                .addConstraint(PluginConfigConstraints.PluginName.class, String.class, new PluginConfigConstraints.PluginName.Factory())
++                                .addNodeResolver(new FlattenedResolver.Factory())
++                                .build()
 +                        );
++
 +                });
 +            })
 +            .build();
@@ -358,16 +400,19 @@ index 0000000000000000000000000000000000000000..dbd8c29ce95bdb36af4b897f5b476b83
 +
 +        // TODO: a better way to do this?
 +        if (node.getString("author") != null) {
-+            if (pluginConfiguration.authors.isEmpty()) {
-+                pluginConfiguration.authors = new ArrayList<>();
-+            }
-+
-+            pluginConfiguration.authors.add(node.getString("author"));
++            pluginConfiguration.authors = ImmutableList.<String>builder()
++                .addAll(pluginConfiguration.authors)
++                .add(node.getString("author"))
++                .build();
 +        }
++
++        pluginConfiguration.displayName = pluginConfiguration.name.replace('_', ' ');
 +
 +        return pluginConfiguration;
 +    }
 +
++    public PaperPluginConfiguration() {
++    }
 +
 +    @Override
 +    public String getIdentifier() {
@@ -386,7 +431,7 @@ index 0000000000000000000000000000000000000000..dbd8c29ce95bdb36af4b897f5b476b83
 +
 +    @Override
 +    public String getDisplayName() {
-+        return this.name.replaceAll("_", " ");
++        return this.displayName;
 +    }
 +
 +    @Override
@@ -445,13 +490,13 @@ index 0000000000000000000000000000000000000000..dbd8c29ce95bdb36af4b897f5b476b83
 +    }
 +
 +    @Override
-+    public Map<?, ?> getLazyPermissions() {
-+        return Map.of();
++    public List<Permission> getPermissions() {
++        return this.permissionConfiguration.permissions();
 +    }
 +
 +    @Override
 +    public PermissionDefault getDefaultPermission() {
-+        return this.defaultPerm;
++        return this.permissionConfiguration.defaultPerm();
 +    }
 +
 +    @Override
@@ -472,14 +517,288 @@ index 0000000000000000000000000000000000000000..dbd8c29ce95bdb36af4b897f5b476b83
 +        return this.loader;
 +    }
 +}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableCollectionSerializer.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableCollectionSerializer.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..b47064eafe4f9445baa09e74f4c89804a34187f4
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableCollectionSerializer.java
+@@ -0,0 +1,90 @@
++package io.papermc.paper.plugin.provider.configuration.serializer;
++
++import com.google.common.collect.ImmutableCollection;
++import org.checkerframework.checker.nullness.qual.Nullable;
++import org.spongepowered.configurate.ConfigurationNode;
++import org.spongepowered.configurate.ConfigurationOptions;
++import org.spongepowered.configurate.serialize.SerializationException;
++import org.spongepowered.configurate.serialize.TypeSerializer;
++import org.spongepowered.configurate.util.CheckedConsumer;
++
++import java.lang.reflect.Type;
++import java.util.Collection;
++import java.util.Collections;
++import java.util.List;
++
++@SuppressWarnings("unchecked")
++public abstract class ImmutableCollectionSerializer<B extends ImmutableCollection.Builder<?>, T extends Collection<?>> implements TypeSerializer<T> {
++
++    protected ImmutableCollectionSerializer() {
++    }
++
++    @Override
++    public final T deserialize(final Type type, final ConfigurationNode node) throws SerializationException {
++        final Type entryType = this.elementType(type);
++        final @Nullable TypeSerializer<?> entrySerial = node.options().serializers().get(entryType);
++        if (entrySerial == null) {
++            throw new SerializationException(node, entryType, "No applicable type serializer for type");
++        }
++
++        if (node.isList()) {
++            final List<? extends ConfigurationNode> values = node.childrenList();
++            final B builder = this.createNew(values.size());
++            for (int i = 0; i < values.size(); ++i) {
++                try {
++                    this.deserializeSingle(i, builder, entrySerial.deserialize(entryType, values.get(i)));
++                } catch (final SerializationException ex) {
++                    ex.initPath(values.get(i)::path);
++                    throw ex;
++                }
++            }
++            return (T) builder.build();
++        } else {
++            final @Nullable Object unwrappedVal = node.raw();
++            if (unwrappedVal != null) {
++                final B builder = this.createNew(1);
++                this.deserializeSingle(0, builder, entrySerial.deserialize(entryType, node));
++                return (T) builder.build();
++            }
++        }
++        return this.emptyValue(type, null);
++    }
++
++    @SuppressWarnings({"unchecked", "rawtypes"})
++    @Override
++    public final void serialize(final Type type, final @Nullable T obj, final ConfigurationNode node) throws SerializationException {
++        final Type entryType = this.elementType(type);
++        final @Nullable TypeSerializer entrySerial = node.options().serializers().get(entryType);
++        if (entrySerial == null) {
++            throw new SerializationException(node, entryType, "No applicable type serializer for type");
++        }
++
++        node.raw(Collections.emptyList());
++        if (obj != null) {
++            this.forEachElement(obj, el -> {
++                final ConfigurationNode child = node.appendListNode();
++                try {
++                    entrySerial.serialize(entryType, el, child);
++                } catch (final SerializationException ex) {
++                    ex.initPath(child::path);
++                    throw ex;
++                }
++            });
++        }
++    }
++
++    @SuppressWarnings({"unchecked"})
++    @Override
++    public @Nullable T emptyValue(final Type specificType, final ConfigurationOptions options) {
++        return (T) this.createNew(0).build();
++    }
++
++    protected abstract Type elementType(Type containerType) throws SerializationException;
++
++    protected abstract B createNew(int size);
++
++    protected abstract void forEachElement(T collection, CheckedConsumer<Object, SerializationException> action) throws SerializationException;
++
++    protected abstract void deserializeSingle(int index, B builder, @Nullable Object deserialized) throws SerializationException;
++
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableListSerializer.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableListSerializer.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..0742f9bb757708c30f64ab0887c53543750830da
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableListSerializer.java
+@@ -0,0 +1,43 @@
++package io.papermc.paper.plugin.provider.configuration.serializer;
++
++import com.google.common.collect.ImmutableList;
++import org.checkerframework.checker.nullness.qual.Nullable;
++import org.spongepowered.configurate.serialize.SerializationException;
++import org.spongepowered.configurate.util.CheckedConsumer;
++
++import java.lang.reflect.ParameterizedType;
++import java.lang.reflect.Type;
++import java.util.List;
++
++public class ImmutableListSerializer extends ImmutableCollectionSerializer<ImmutableList.Builder<?>, List<?>> {
++
++    @Override
++    protected Type elementType(Type containerType) throws SerializationException {
++        if (!(containerType instanceof ParameterizedType)) {
++            throw new SerializationException(containerType, "Raw types are not supported for collections");
++        }
++        return ((ParameterizedType) containerType).getActualTypeArguments()[0];
++    }
++
++    @Override
++    protected ImmutableList.Builder<?> createNew(int size) {
++        return ImmutableList.builderWithExpectedSize(size);
++    }
++
++    @Override
++    protected void forEachElement(List<?> collection, CheckedConsumer<Object, SerializationException> action) throws SerializationException {
++        for (Object obj : collection) {
++            action.accept(obj);
++        }
++    }
++
++    @SuppressWarnings({"unchecked", "rawtypes"})
++    @Override
++    protected void deserializeSingle(int index, ImmutableList.Builder<?> builder, @Nullable Object deserialized) throws SerializationException {
++        if (deserialized == null) {
++            return;
++        }
++
++        ((ImmutableList.Builder) builder).add(deserialized);
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/PermissionConfigurationSerializer.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/PermissionConfigurationSerializer.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..26264ba5c26ccb15dbbf0b5a750283c6ce7bcebd
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/PermissionConfigurationSerializer.java
+@@ -0,0 +1,122 @@
++package io.papermc.paper.plugin.provider.configuration.serializer;
++
++import com.google.common.base.Preconditions;
++import io.papermc.paper.plugin.provider.configuration.type.PermissionConfiguration;
++import org.bukkit.permissions.Permission;
++import org.bukkit.permissions.PermissionDefault;
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
++import org.spongepowered.configurate.ConfigurationNode;
++import org.spongepowered.configurate.serialize.SerializationException;
++import org.spongepowered.configurate.serialize.TypeSerializer;
++
++import java.lang.reflect.Type;
++import java.util.ArrayList;
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Map;
++
++public class PermissionConfigurationSerializer {
++
++    public static final Serializer SERIALIZER = new Serializer();
++
++    private static final class Serializer implements TypeSerializer<PermissionConfiguration> {
++        private Serializer() {
++            super();
++        }
++
++        @Override
++        public PermissionConfiguration deserialize(Type type, ConfigurationNode node) throws SerializationException {
++            Map<?, ?> map = (Map<?, ?>) node.node("permissions").raw();
++            PermissionDefault permissionDefault = node.node("defaultPerm").get(PermissionDefault.class);
++            if (permissionDefault == null) {
++                permissionDefault = PermissionDefault.OP;
++            }
++
++            List<Permission> result = new ArrayList<>();
++            if (map != null) {
++                for (Map.Entry<?, ?> entry : map.entrySet()) {
++                    try {
++                        result.add(Permission.loadPermission(entry.getKey().toString(), (Map<?, ?>) entry.getValue(), permissionDefault, result));
++                    } catch (Throwable ex) {
++                        throw new SerializationException(null, "Error loading permission %s".formatted(entry.getKey()), ex);
++                    }
++                }
++            }
++
++            return new PermissionConfiguration(permissionDefault, List.copyOf(result));
++        }
++
++        @Override
++        public void serialize(Type type, @org.checkerframework.checker.nullness.qual.Nullable PermissionConfiguration obj, ConfigurationNode node) throws SerializationException {
++
++        }
++
++        @NotNull
++        public static Permission loadPermission(@NotNull String name, @NotNull Map<?, ?> data, @Nullable PermissionDefault def, @Nullable List<Permission> output) {
++            Preconditions.checkArgument(name != null, "Name cannot be null");
++            Preconditions.checkArgument(data != null, "Data cannot be null");
++
++            String desc = null;
++            Map<String, Boolean> children = null;
++
++            if (data.get("default") != null) {
++                PermissionDefault value = PermissionDefault.getByName(data.get("default").toString());
++                if (value != null) {
++                    def = value;
++                } else {
++                    throw new IllegalArgumentException("'default' key contained unknown value");
++                }
++            }
++
++            if (data.get("children") != null) {
++                Object childrenNode = data.get("children");
++                if (childrenNode instanceof Iterable) {
++                    children = new LinkedHashMap<String, Boolean>();
++                    for (Object child : (Iterable<?>) childrenNode) {
++                        if (child != null) {
++                            children.put(child.toString(), Boolean.TRUE);
++                        }
++                    }
++                } else if (childrenNode instanceof Map) {
++                    children = extractChildren((Map<?, ?>) childrenNode, name, def, output);
++                } else {
++                    throw new IllegalArgumentException("'children' key is of wrong type");
++                }
++            }
++
++            if (data.get("description") != null) {
++                desc = data.get("description").toString();
++            }
++
++            return new Permission(name, desc, def, children);
++        }
++
++        @NotNull
++        private static Map<String, Boolean> extractChildren(@NotNull Map<?, ?> input, @NotNull String name, @Nullable PermissionDefault def, @Nullable List<Permission> output) {
++            Map<String, Boolean> children = new LinkedHashMap<String, Boolean>();
++
++            for (Map.Entry<?, ?> entry : input.entrySet()) {
++                if ((entry.getValue() instanceof Boolean)) {
++                    children.put(entry.getKey().toString(), (Boolean) entry.getValue());
++                } else if ((entry.getValue() instanceof Map)) {
++                    try {
++                        Permission perm = loadPermission(entry.getKey().toString(), (Map<?, ?>) entry.getValue(), def, output);
++                        children.put(perm.getName(), Boolean.TRUE);
++
++                        if (output != null) {
++                            output.add(perm);
++                        }
++                    } catch (Throwable ex) {
++                        throw new IllegalArgumentException("Permission node '" + entry.getKey().toString() + "' in child of " + name + " is invalid", ex);
++                    }
++                } else {
++                    throw new IllegalArgumentException("Child '" + entry.getKey().toString() + "' contains invalid value");
++                }
++            }
++
++            return children;
++        }
++
++    }
++}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/constraints/PluginConfigConstraints.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/constraints/PluginConfigConstraints.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..faf027ea0dba4b98e43d6f86d9b81056cf85cf5b
+index 0000000000000000000000000000000000000000..fdc3725830123382f68a0ed618f058efc3c48143
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/constraints/PluginConfigConstraints.java
-@@ -0,0 +1,53 @@
+@@ -0,0 +1,67 @@
 +package io.papermc.paper.plugin.provider.configuration.serializer.constraints;
 +
++import io.papermc.paper.plugin.provider.util.NamespaceChecker;
 +import org.spongepowered.configurate.objectmapping.meta.Constraint;
 +import org.spongepowered.configurate.serialize.SerializationException;
 +
@@ -489,9 +808,13 @@ index 0000000000000000000000000000000000000000..faf027ea0dba4b98e43d6f86d9b81056
 +import java.lang.annotation.RetentionPolicy;
 +import java.lang.annotation.Target;
 +import java.lang.reflect.Type;
++import java.util.Locale;
++import java.util.Set;
 +import java.util.regex.Pattern;
 +
 +public final class PluginConfigConstraints {
++
++    public static final Set<String> RESERVED_KEYS = Set.of("bukkit", "minecraft", "mojang");
 +
 +    @Documented
 +    @Retention(RetentionPolicy.RUNTIME)
@@ -505,8 +828,17 @@ index 0000000000000000000000000000000000000000..faf027ea0dba4b98e43d6f86d9b81056
 +            @Override
 +            public Constraint<String> make(PluginName data, Type type) {
 +                return value -> {
-+                    if (value != null && !VALID_NAME.matcher(value).matches()) {
-+                        throw new SerializationException("name '" + value + "' contains invalid characters.");
++                    if (value != null) {
++                        if (RESERVED_KEYS.contains(value.toLowerCase(Locale.ROOT))) {
++                            throw new SerializationException("Restricted name, cannot use '%s' as a plugin name.".formatted(data));
++                        } else if (value.indexOf(' ') != -1) {
++                            // For legacy reasons, the space condition has a separate exception message.
++                            throw new SerializationException("Restricted name, cannot use 0x20 (space character) in a plugin name.");
++                        }
++
++                        if (!VALID_NAME.matcher(value).matches()) {
++                            throw new SerializationException("name '" + value + "' contains invalid characters.");
++                        }
 +                    }
 +                };
 +            }
@@ -523,8 +855,8 @@ index 0000000000000000000000000000000000000000..faf027ea0dba4b98e43d6f86d9b81056
 +            @Override
 +            public Constraint<String> make(PluginName data, Type type) {
 +                return value -> {
-+                    if (value != null && value.startsWith("org.bukkit.")) {
-+                        throw new SerializationException("main may not be within the org.bukkit namespace");
++                    if (value != null && !NamespaceChecker.isValidNameSpace(value)) {
++                        throw new SerializationException("provided class '%s' is in an invalid namespace.".formatted(value));
 +                    }
 +                };
 +            }
@@ -533,10 +865,10 @@ index 0000000000000000000000000000000000000000..faf027ea0dba4b98e43d6f86d9b81056
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PaperCommandMap.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PaperCommandMap.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..314cfd14b0632e4b4f7f2ec1dbd977b0d1e331ff
+index 0000000000000000000000000000000000000000..80d32d82299fb20cc84429ab7b04fc051fcd2bbb
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PaperCommandMap.java
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,67 @@
 +package io.papermc.paper.plugin.provider.configuration.type;
 +
 +import com.google.common.collect.ImmutableList;
@@ -554,37 +886,8 @@ index 0000000000000000000000000000000000000000..314cfd14b0632e4b4f7f2ec1dbd977b0
 +
 +    private final Map<String, Map<String, Object>> map;
 +
-+    public PaperCommandMap() {
-+        this.map = Map.of();
-+    }
-+
-+    public PaperCommandMap(Map<?, ?> data) throws SerializationException {
-+        ImmutableMap.Builder<String, Map<String, Object>> commandsBuilder = ImmutableMap.builder();
-+        try {
-+            for (Map.Entry<?, ?> command : data.entrySet()) {
-+                ImmutableMap.Builder<String, Object> commandBuilder = ImmutableMap.builder();
-+                if (command.getValue() != null) {
-+                    for (Map.Entry<?, ?> commandEntry : ((Map<?, ?>) command.getValue()).entrySet()) {
-+                        if (commandEntry.getValue() instanceof Iterable) {
-+                            // This prevents internal alias list changes
-+                            ImmutableList.Builder<Object> commandSubList = ImmutableList.builder();
-+                            for (Object commandSubListItem : (Iterable<?>) commandEntry.getValue()) {
-+                                if (commandSubListItem != null) {
-+                                    commandSubList.add(commandSubListItem);
-+                                }
-+                            }
-+                            commandBuilder.put(commandEntry.getKey().toString(), commandSubList.build());
-+                        } else if (commandEntry.getValue() != null) {
-+                            commandBuilder.put(commandEntry.getKey().toString(), commandEntry.getValue());
-+                        }
-+                    }
-+                }
-+                commandsBuilder.put(command.getKey().toString(), commandBuilder.build());
-+            }
-+        } catch (ClassCastException ex) {
-+            throw new SerializationException("commands are of wrong type");
-+        }
-+        this.map = commandsBuilder.build();
++    public PaperCommandMap(Map<String, Map<String, Object>> map) {
++        this.map = map;
 +    }
 +
 +    public Map<String, Map<String, Object>> getMap() {
@@ -598,7 +901,33 @@ index 0000000000000000000000000000000000000000..314cfd14b0632e4b4f7f2ec1dbd977b0
 +
 +        @Override
 +        public PaperCommandMap deserialize(Type type, Object obj) throws SerializationException {
-+            return new PaperCommandMap((Map<?, ?>) obj);
++            // Copied from PluginDescriptionFile#loadMap
++            ImmutableMap.Builder<String, Map<String, Object>> commandsBuilder = ImmutableMap.builder();
++            try {
++                for (Map.Entry<?, ?> command : ((Map<?, ?>) obj).entrySet()) {
++                    ImmutableMap.Builder<String, Object> commandBuilder = ImmutableMap.builder();
++                    if (command.getValue() != null) {
++                        for (Map.Entry<?, ?> commandEntry : ((Map<?, ?>) command.getValue()).entrySet()) {
++                            if (commandEntry.getValue() instanceof Iterable) {
++                                // This prevents internal alias list changes
++                                ImmutableList.Builder<Object> commandSubList = ImmutableList.builder();
++                                for (Object commandSubListItem : (Iterable<?>) commandEntry.getValue()) {
++                                    if (commandSubListItem != null) {
++                                        commandSubList.add(commandSubListItem);
++                                    }
++                                }
++                                commandBuilder.put(commandEntry.getKey().toString(), commandSubList.build());
++                            } else if (commandEntry.getValue() != null) {
++                                commandBuilder.put(commandEntry.getKey().toString(), commandEntry.getValue());
++                            }
++                        }
++                    }
++                    commandsBuilder.put(command.getKey().toString(), commandBuilder.build());
++                }
++            } catch (ClassCastException ex) {
++                throw new SerializationException("commands are of wrong type");
++            }
++            return new PaperCommandMap(commandsBuilder.build());
 +        }
 +
 +        @Override
@@ -606,6 +935,26 @@ index 0000000000000000000000000000000000000000..314cfd14b0632e4b4f7f2ec1dbd977b0
 +            return item.getMap();
 +        }
 +    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PermissionConfiguration.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PermissionConfiguration.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..a180612a1ec395202dbae1ca5b97ec01382097e4
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PermissionConfiguration.java
+@@ -0,0 +1,14 @@
++package io.papermc.paper.plugin.provider.configuration.type;
++
++import org.bukkit.permissions.Permission;
++import org.bukkit.permissions.PermissionDefault;
++import org.spongepowered.configurate.objectmapping.ConfigSerializable;
++
++import java.util.List;
++
++// Record components used for deserialization!!!!
++@ConfigSerializable
++public record PermissionConfiguration(
++    PermissionDefault defaultPerm,
++    List<Permission> permissions) {
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/PaperClasspathBuilder.java b/src/main/java/io/papermc/paper/plugin/provider/loader/PaperClasspathBuilder.java
 new file mode 100644
@@ -1673,10 +2022,10 @@ index 0000000000000000000000000000000000000000..50517236e785db42de550393fd7b3253
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/source/impl/DirectoryProviderSource.java b/src/main/java/io/papermc/paper/plugin/provider/source/impl/DirectoryProviderSource.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..58424da40a56c87960542b5a8bbefc1c35ad2cc7
+index 0000000000000000000000000000000000000000..51137b8c02b3f4e744efd03587b3a43ac31dc397
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/source/impl/DirectoryProviderSource.java
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,34 @@
 +package io.papermc.paper.plugin.provider.source.impl;
 +
 +import io.papermc.paper.plugin.provider.source.ProviderSource;
@@ -1688,16 +2037,23 @@ index 0000000000000000000000000000000000000000..58424da40a56c87960542b5a8bbefc1c
 +
 +public class DirectoryProviderSource implements ProviderSource<Path> {
 +
-+    public static final DirectoryProviderSource INSTANCE = new DirectoryProviderSource();
 +    private static final Logger LOGGER = Logger.getLogger("DirectoryProviderSource");
++    public static final DirectoryProviderSource INSTANCE = new DirectoryProviderSource();
 +
 +    private final FileProviderSource providerSource = new FileProviderSource(false);
 +
 +    @Override
 +    public void registerProviders(Path context) throws Exception {
++        // Sym link happy, create file if missing.
++        if (!Files.isDirectory(context)) {
++            Files.createDirectories(context);
++        }
++
 +        Files.walk(context, 1).filter(Files::isRegularFile).forEach((path) -> {
 +            try {
 +                this.providerSource.registerProviders(path);
++            } catch (IllegalArgumentException ignored) {
++                // Ignore initial argument exceptions
 +            } catch (Exception e) {
 +                LOGGER.log(Level.SEVERE, "Error loading plugin: " + e.getMessage(), e);
 +            }
@@ -1759,7 +2115,7 @@ index 0000000000000000000000000000000000000000..cef457e2d92905c9abbea473d341e585
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/source/impl/PluginFlagProviderSource.java b/src/main/java/io/papermc/paper/plugin/provider/source/impl/PluginFlagProviderSource.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..226fe9e1f69e706059a5a7d3f1f3407a0c13133f
+index 0000000000000000000000000000000000000000..41686a0985e03e0177400ee646604b195d32d657
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/source/impl/PluginFlagProviderSource.java
 @@ -0,0 +1,27 @@
@@ -1774,8 +2130,8 @@ index 0000000000000000000000000000000000000000..226fe9e1f69e706059a5a7d3f1f3407a
 +
 +public class PluginFlagProviderSource implements ProviderSource<List<File>> {
 +
-+    public static final PluginFlagProviderSource INSTANCE = new PluginFlagProviderSource();
 +    private static final Logger LOGGER = Logger.getLogger("PluginFlagProviderSource");
++    public static final PluginFlagProviderSource INSTANCE = new PluginFlagProviderSource();
 +
 +    private final FileProviderSource providerSource = new FileProviderSource(true);
 +
@@ -2362,12 +2718,13 @@ index 0000000000000000000000000000000000000000..9081fd066f45696575f92c4b03b15bce
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProviderFactory.java b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProviderFactory.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..b42a007c1a57bba60b2514099cb1ce6d79a6cf51
+index 0000000000000000000000000000000000000000..e856f7900026e508a1076c28ccace58acb461c23
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProviderFactory.java
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,40 @@
 +package io.papermc.paper.plugin.provider.type.spigot;
 +
++import io.papermc.paper.plugin.provider.configuration.serializer.constraints.PluginConfigConstraints;
 +import io.papermc.paper.plugin.provider.type.PluginProviderFactory;
 +import org.bukkit.plugin.InvalidDescriptionException;
 +import org.bukkit.plugin.PluginDescriptionFile;
@@ -2376,6 +2733,7 @@ index 0000000000000000000000000000000000000000..b42a007c1a57bba60b2514099cb1ce6d
 +import java.io.IOException;
 +import java.io.InputStream;
 +import java.nio.file.Path;
++import java.util.Locale;
 +import java.util.jar.JarEntry;
 +import java.util.jar.JarFile;
 +
@@ -2390,19 +2748,13 @@ index 0000000000000000000000000000000000000000..b42a007c1a57bba60b2514099cb1ce6d
 +            throw new InvalidDescriptionException(ex);
 +        }
 +
-+        // TODO ORIGINAL CODE: Should I keep logging it or should this be an exception?
-+//        if (name.equalsIgnoreCase("bukkit") || name.equalsIgnoreCase("minecraft") || name.equalsIgnoreCase("mojang")) {
-+//            server.getLogger().log(Level.SEVERE, "Could not load '" + file.getPath() + "' in folder '" + file.getParentFile().getPath() + "': Restricted Name"); // Paper
-+//            continue;
-+//        } else if (description.rawName.indexOf(' ') != -1) {
-+//            server.getLogger().log(Level.SEVERE, "Could not load '" + file.getPath() + "' in folder '" + file.getParentFile().getPath() + "': uses the space-character (0x20) in its name"); // Paper
-+//            continue;
-+//        }
-+
-+        String name = descriptionFile.getIdentifier();
-+        if (name.equalsIgnoreCase("bukkit") || name.equalsIgnoreCase("minecraft") || name.equalsIgnoreCase("mojang")) {
++        // Copied from SimplePluginManager#loadPlugins
++        // Spigot doesn't validate the name when the config is created, and instead when the plugin is loaded.
++        // Paper plugin configuration will do these checks in config serializer instead of when this is created.
++        String name = descriptionFile.getRawName();
++        if (PluginConfigConstraints.RESERVED_KEYS.contains(name.toLowerCase(Locale.ROOT))) {
 +            throw new InvalidDescriptionException("Restricted name, cannot use %s as a plugin name.".formatted(name));
-+        } else if (descriptionFile.getRawName().indexOf(' ') != -1) {
++        } else if (name.indexOf(' ') != -1) {
 +            throw new InvalidDescriptionException("Restricted name, cannot use 0x20 (space character) in a plugin name.");
 +        }
 +
@@ -2411,24 +2763,16 @@ index 0000000000000000000000000000000000000000..b42a007c1a57bba60b2514099cb1ce6d
 +}
 +
 diff --git a/src/main/java/net/minecraft/server/Main.java b/src/main/java/net/minecraft/server/Main.java
-index 0a843e0afbcb1af8e2641515eb244b791b819b8c..df9f8af62f5fdea5000b042d51d20b823f7229f8 100644
+index 0a843e0afbcb1af8e2641515eb244b791b819b8c..4b8c02a7f91db1b98d8c54076999cb31dfa5b814 100644
 --- a/src/main/java/net/minecraft/server/Main.java
 +++ b/src/main/java/net/minecraft/server/Main.java
-@@ -59,7 +59,6 @@ import org.slf4j.Logger;
- 
- // CraftBukkit start
- import java.util.concurrent.atomic.AtomicReference;
--import net.minecraft.SharedConstants;
- 
- public class Main {
- 
-@@ -105,6 +104,16 @@ public class Main {
+@@ -105,6 +105,16 @@ public class Main {
              }
  
              Bootstrap.bootStrap();
 +            // Paper start
 +            io.papermc.paper.plugin.provider.source.Providers provider = io.papermc.paper.plugin.provider.source.Providers.INSTANCE;
-+            File pluginfile = ((File) optionset.valueOf("plugins"));
++            File pluginfile = (File) optionset.valueOf("plugins");
 +            provider.addProviders(io.papermc.paper.plugin.provider.source.impl.DirectoryProviderSource.INSTANCE, pluginfile.toPath());
 +
 +            @SuppressWarnings("unchecked")
