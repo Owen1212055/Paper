@@ -7,3 +7,13 @@ api-version: ${apiversion}
 load: STARTUP
 bootstrapper: io.papermc.paper.testplugin.TestPluginBootstrap
 loader: io.papermc.paper.testplugin.TestPluginLoader
+defaultPerm: FALSE
+permissions:
+  test.plugin:
+    description: Gives access to the awesome customcommand
+commands:
+  customcommand:
+    description: Does a really cool epic thing, nothing!
+    usage: /servermode <nothing> [<also nothing>]
+    permission: test.plugin
+    permission-message: '<red>Now supports <bold>MINIMESSAGE</bold></red>'

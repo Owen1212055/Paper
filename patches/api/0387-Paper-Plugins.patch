@@ -52,171 +52,238 @@ index 76f2cb9cd99cad2a9484eab2becd8c36f1dd91b3..04cc721f95bfdf861f828cc853f7b8d1
      }
  
      @Override
-diff --git a/src/main/java/io/papermc/paper/plugin/PluginBootstrap.java b/src/main/java/io/papermc/paper/plugin/PluginBootstrap.java
+diff --git a/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrap.java b/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrap.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..8cfb0710c6ee39335b0b8867fd3b83f88f1bddbd
+index 0000000000000000000000000000000000000000..721cdeacdbc74c23811fc0119e213e1d8df92275
 --- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/PluginBootstrap.java
-@@ -0,0 +1,10 @@
-+package io.papermc.paper.plugin;
++++ b/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrap.java
+@@ -0,0 +1,36 @@
++package io.papermc.paper.plugin.bootstrap;
++
++import io.papermc.paper.plugin.provider.util.ProviderUtil;
++import org.bukkit.plugin.java.JavaPlugin;
++import org.jetbrains.annotations.NotNull;
 +
 +/**
-+ *
++ * A plugin boostrap is meant for loading certain parts of the plugin before the server is loaded.
++ * <p>
++ * Plugin bootstrapping allows values to be initialized in certain parts of the server that might not be allowed
++ * when the server is running.
++ * <p>
++ * Your bootstrap class will be on the same classloader as your JavaPlugin.
++ * <p>
++ * <b>All calls to Bukkit may throw a NullPointerExceptions or return null unexpectedly. You should only call api methods that are explicitly documented to work in the bootstrapper</b>
 + */
 +public interface PluginBootstrap {
 +
-+    void boostrap();
++    /**
++     * Called by the server, allowing you to bootstrap with context that provides things like a logger and your shared plugin configuration file.
++     *
++     * @param context server provided context
++     */
++    void boostrap(@NotNull PluginBootstrapContext context);
 +
++    /**
++     * Called by the server, allows you to create your own java plugin instance inorder to do things such as
++     * pass objects through the constructor.
++     * @param context server created bootstrap object
++     * @return java plugin instance
++     */
++    @NotNull
++    default JavaPlugin createPlugin(@NotNull PluginBootstrapContext context) {
++        return ProviderUtil.loadClass(context.getConfiguration().getMain(), JavaPlugin.class, this.getClass().getClassLoader());
++    }
 +}
-diff --git a/src/main/java/io/papermc/paper/plugin/PluginLoader.java b/src/main/java/io/papermc/paper/plugin/PluginLoader.java
+diff --git a/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrapContext.java b/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrapContext.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..49f679d209aee307767f956916001f8b1b0d4ef5
+index 0000000000000000000000000000000000000000..110aff2466a861dc4a9d92d660c52d6ca326909c
 --- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/PluginLoader.java
-@@ -0,0 +1,12 @@
-+package io.papermc.paper.plugin;
-+
-+import io.papermc.paper.plugin.provider.loader.PluginClasspathBuilder;
-+
-+/**
-+ *
-+ */
-+public interface PluginLoader {
-+
-+    void classloader(PluginClasspathBuilder classpathBuilder);
-+
-+}
-diff --git a/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
-new file mode 100644
-index 0000000000000000000000000000000000000000..0b588b712ea9905268012a3c21fc2ae3a99fdf70
---- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
-@@ -0,0 +1,37 @@
-+package io.papermc.paper.plugin.provider;
++++ b/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrapContext.java
+@@ -0,0 +1,46 @@
++package io.papermc.paper.plugin.bootstrap;
 +
 +import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
 +import org.jetbrains.annotations.ApiStatus;
 +import org.jetbrains.annotations.NotNull;
 +
 +import java.nio.file.Path;
-+import java.util.jar.JarFile;
 +import java.util.logging.Logger;
 +
-+/*
-+Plugin providers are meant to be the initial pre-loading stage of a plugin.
-+This allows the plugin to be interacted with without truly messing with it.
++/**
++ * Contains context used for when a plugin's bootstrap class is executed.
 + */
-+@ApiStatus.Internal
-+public interface PluginProvider<T> {
++@ApiStatus.NonExtendable
++public interface PluginBootstrapContext {
 +
++    /**
++     * Gets the plugin's configuration.
++     * @return configuration
++     */
 +    @NotNull
-+    Path getSource();
-+
-+    default Path getFileName() {
-+        return this.getSource().getFileName();
-+    }
-+
-+    default Path getParentSource() {
-+        return this.getSource().getParent();
-+    }
-+
-+    JarFile file();
-+
-+    T createInstance();
-+
 +    PluginConfiguration getConfiguration();
 +
++    /**
++     * Gets the path to the data directory for the plugin.
++     *
++     * @return plugin
++     */
++    @NotNull
++    Path getDataDirectory();
++
++    /**
++     * Gets the configuration file for this plugin.
++     *
++     * @return configuration file
++     */
++    @NotNull
++    Path getConfigurationFile();
++
++    /**
++     * Gets the logger used for this plugin.
++     *
++     * @return logger
++     */
++    @NotNull
 +    Logger getLogger();
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/loader/PluginLoader.java b/src/main/java/io/papermc/paper/plugin/loader/PluginLoader.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..994bf078c5c6070f1ead31e28fd2ffd65774ed85
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/loader/PluginLoader.java
+@@ -0,0 +1,26 @@
++package io.papermc.paper.plugin.loader;
++
++import io.papermc.paper.plugin.provider.loader.PluginClasspathBuilder;
++import org.jetbrains.annotations.NotNull;
++
++/**
++ * A plugin loader is responsible for creating certain aspects of a plugin before it is created.
++ * <p>
++ * The goal of this is to allow certain configuration values to be moved and can instead be
++ * configured at run time inorder to make plugins a bit more dynamic.
++ * <p>
++ * It should be noted that this class will be called from a different classloader, this will cause any static values
++ * set in this class/any other classes loaded not to persist when the plugin loads.
++ */
++public interface PluginLoader {
++
++    /**
++     * Called by the server, allows you to configure the classpath that your plugin is run on.
++     * This allows you to configure dependencies for your plugin where jars can be downloaded or
++     * provided during runtime.
++     *
++     * @param classpathBuilder classpath builder
++     */
++    void classloader(@NotNull PluginClasspathBuilder classpathBuilder);
 +
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/BukkitConfigurationWrapper.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/BukkitConfigurationWrapper.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..5c254dd2024d323b407690236649099dd0c2b781
+index 0000000000000000000000000000000000000000..f5d3d758b1273647b054005d70414ac13a39c8cf
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/BukkitConfigurationWrapper.java
-@@ -0,0 +1,111 @@
+@@ -0,0 +1,132 @@
 +package io.papermc.paper.plugin.provider.configuration;
 +
 +import org.bukkit.permissions.Permission;
 +import org.bukkit.permissions.PermissionDefault;
 +import org.bukkit.plugin.PluginDescriptionFile;
 +import org.bukkit.plugin.PluginLoadOrder;
++import org.jetbrains.annotations.ApiStatus;
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
 +
 +import java.util.List;
-+import java.util.Map;
 +
++@ApiStatus.Internal
 +public interface BukkitConfigurationWrapper extends PluginConfiguration {
 +
++    /**
++     * Gets the bukkit configuration for this plugin configuration.
++     *
++     * @return bukkit configuration
++     */
 +    PluginDescriptionFile spigotDescription();
 +
 +    @Override
-+    default String getIdentifier() {
++    default @NotNull String getIdentifier() {
 +        return this.spigotDescription().getName();
 +    }
 +
 +    @Override
-+    default String getVersion() {
++    default @NotNull String getVersion() {
 +        return this.spigotDescription().getVersion();
 +    }
 +
 +    @Override
-+    default String getMain() {
++    default @NotNull String getMain() {
 +        return this.spigotDescription().getMain();
 +    }
 +
 +    @Override
-+    default String getDisplayName() {
++    default @NotNull String getDisplayName() {
 +        return this.spigotDescription().getFullName();
 +    }
 +
 +    @Override
-+    default String getLoggingPrefix() {
-+        return this.spigotDescription().getPrefix();
++    default @NotNull String getLoggingPrefix() {
++        String prefix = this.spigotDescription().getPrefix();
++        if (prefix == null) {
++            return this.getIdentifier();
++        }
++
++        return prefix;
 +    }
 +
 +    @Override
-+    default PluginLoadOrder getLoadOrder() {
++    default @NotNull PluginLoadOrder getLoadPhase() {
 +        return this.spigotDescription().getLoad();
 +    }
 +
 +    @Override
-+    default List<String> getHardDependencies() {
++    default @NotNull List<String> getHardDependencies() {
 +        return this.spigotDescription().getDepend();
 +    }
 +
 +    @Override
-+    default List<String> getSoftDependencies() {
++    default @NotNull List<String> getSoftDependencies() {
 +        return this.spigotDescription().getSoftDepend();
 +    }
 +
 +    @Override
-+    default List<String> getLoadBefore() {
++    default @NotNull List<String> getLoadBefore() {
 +        return this.spigotDescription().getLoadBefore();
 +    }
 +
 +    @Override
-+    default List<Permission> getPermissions() {
++    default @NotNull List<Permission> getPermissions() {
 +        return this.spigotDescription().getPermissions();
 +    }
 +
 +    @Override
-+    default PermissionDefault getDefaultPermission() {
-+        return this.spigotDescription().getDefaultPermission();
++    default @NotNull PermissionDefault getDefaultPermission() {
++        return this.spigotDescription().getPermissionDefault();
 +    }
 +
 +
 +    @Override
-+    default String getApiVersion() {
-+        return this.spigotDescription().getAPIVersion();
++    default @NotNull String getApiVersion() {
++        String version = this.spigotDescription().getAPIVersion();
++        if (version == null) {
++            return "<1.13";
++        }
++
++        return version;
 +    }
 +
 +    @Override
-+    default List<String> getProvides() {
-+        return this.spigotDescription().getProvides();
++    default @NotNull List<String> getProvides() {
++        return nullable(this.spigotDescription().getProvides());
 +    }
 +
 +    @Override
-+    default String getWebsite() {
++    default @Nullable String getWebsite() {
 +        return this.spigotDescription().getWebsite();
 +    }
 +
@@ -227,115 +294,283 @@ index 0000000000000000000000000000000000000000..5c254dd2024d323b407690236649099d
 +    }
 +
 +    @Override
-+    default Map<String, Map<String, Object>> getRawCommands() {
-+        return this.spigotDescription().getCommands();
-+    }
-+
-+    @Override
-+    default String getDescription() {
++    default @Nullable String getDescription() {
 +        return this.spigotDescription().getDescription();
 +    }
 +
 +    @Override
-+    default List<String> getAuthors() {
-+        return this.spigotDescription().getAuthors();
++    default @NotNull List<String> getAuthors() {
++        return nullable(this.spigotDescription().getAuthors());
 +    }
 +
 +    @Override
-+    default List<String> getContributors() {
-+        return this.spigotDescription().getContributors();
++    default @NotNull List<String> getContributors() {
++        return nullable(this.spigotDescription().getContributors());
++    }
++
++    private static List<String> nullable(List<String> strings) {
++        if (strings == null) {
++            return List.of();
++        }
++
++        return nullable(strings);
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/PluginConfiguration.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/PluginConfiguration.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..93033ef82eab37bb4dce06c03e52610fbdfc0154
+index 0000000000000000000000000000000000000000..18f418f67a9cfa1a53320ec5aa19b282552aaa09
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/PluginConfiguration.java
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,178 @@
 +package io.papermc.paper.plugin.provider.configuration;
 +
 +import org.bukkit.permissions.Permission;
 +import org.bukkit.permissions.PermissionDefault;
 +import org.bukkit.plugin.PluginLoadOrder;
++import org.bukkit.plugin.java.JavaPlugin;
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
 +
 +import java.util.List;
-+import java.util.Map;
 +
++/**
++ * This class acts as an abstraction for a plugin configuration.
++ */
 +public interface PluginConfiguration {
 +
++    /**
++     * Gives the name of the plugin. This name is a unique identifier for
++     * plugins.
++     * <ul>
++     * <li>Will only contain alphanumeric characters, underscores, hyphon,
++     *     and period (a-z,A-Z,0-9,_.-).
++     * <li>Typically used for identifying the plugin data folder.
++     * <li>The is the token referenced in {@link #getHardDependencies()}, {@link
++     *     #getSoftDependencies()}, and {@link #getLoadBefore()}.
++     * </ul>
++     * <p>
++     * In the plugin.yml, this entry is named <code>name</code>.
++     * <p>
++     * Example:<blockquote><pre>name: MyPlugin</pre></blockquote>
++     *
++     * @return the name of the plugin
++     */
++    @NotNull
 +    String getIdentifier();
 +
++    /**
++     * Returns the name of a plugin, including the version.
++     *
++     * @return a descriptive name of the plugin and respective version
++     */
++    @NotNull
++    default String getDisplayName() {
++        return this.getIdentifier() + " v" + this.getVersion();
++    }
++
++    /**
++     * Gives the fully qualified name of the main class for a plugin.
++     * A {@link JavaPlugin} is expected at this location.
++     *
++     * @return the fully qualified main class for the plugin
++     */
++    @NotNull
 +    String getMain();
 +
++    /**
++     * Gives the phase of server startup that the plugin should be loaded.
++     *
++     * @return phase
++     */
++    @NotNull
++    PluginLoadOrder getLoadPhase();
++
++    /**
++     * Gets the version of this plugin
++     *
++     * @return version string
++     */
++    @NotNull
 +    String getVersion();
 +
-+    String getDisplayName();
-+
++    /**
++     * Gets the prefix that should be used for the plugin logger.
++     *
++     * @return logger prefix
++     */
++    @NotNull
 +    String getLoggingPrefix();
 +
++    /**
++     * Gets a list of dependencies that are required for this plugin to load.
++     *
++     * @return immutable list of required dependencies
++     */
++    @NotNull
 +    List<String> getHardDependencies();
 +
++    /**
++     * Gets a list of dependencies that are used but not required for this plugin to load.
++     *
++     * @return immutable list of soft dependencies
++     */
++    @NotNull
 +    List<String> getSoftDependencies();
 +
++    /**
++     * Gets a list of dependencies that should be loaded before this plugin is loaded.
++     *
++     * @return immutable list of dependencies to load before
++     */
++    @NotNull
 +    List<String> getLoadBefore();
 +
-+    PluginLoadOrder getLoadOrder();
++    /**
++     * Gets a list of plugins/dependencies that this plugin provides.
++     *
++     * @return immutable list of provided plugins/dependencies
++     */
++    @NotNull
++    List<String> getProvides();
 +
-+    boolean isTransitiveDependency(PluginConfiguration other);
-+
-+
-+    Map<String, Map<String, Object>> getRawCommands();
-+
-+    String getDescription();
-+
++    /**
++     * Gives a list of authors that created this plugin.
++     *
++     * @return an immutable list of the plugin's authors
++     */
++    @NotNull
 +    List<String> getAuthors();
 +
++    /**
++     * Gets a list of contributors that created this plugin.
++     *
++     * @return an immutable list of the plugin's contributors
++     */
++    @NotNull
 +    List<String> getContributors();
 +
++    /**
++     * Gives a human-friendly description of the functionality the plugin
++     * provides.
++     *
++     * @return description or null if unset
++     */
++    @Nullable
++    String getDescription();
++
++    /**
++     * Gets the website for the plugin or the plugin's author.
++     *
++     * @return website or null if unset
++     */
++    @Nullable
 +    String getWebsite();
 +
++    /**
++     * Gets a list of permissions that are registered in this plugin configuration.
++     *
++     * @return an immutable list of permissions
++     */
++    // TODO: Do we even want this? Why not just use the bootstrapper
++    @NotNull
 +    List<Permission> getPermissions();
 +
++    /**
++     * Gets the default permission value for configured permissions.
++     *
++     * @return default permission
++     */
++    // TODO: Do we even want this? Why not just use the bootstrapper
++    @NotNull
 +    PermissionDefault getDefaultPermission();
 +
++    /**
++     * Gets the api version that this plugin supports.
++     *
++     * @return version
++     */
++    @NotNull
 +    String getApiVersion();
 +
-+    List<String> getProvides();
++    /**
++     * Unfinished. // TODO:
++     *
++     * @param other
++     * @return
++     */
++    boolean isTransitiveDependency(@NotNull PluginConfiguration other);
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/PluginClasspathBuilder.java b/src/main/java/io/papermc/paper/plugin/provider/loader/PluginClasspathBuilder.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0a7ffea9e1e1d5b33328809b8f1bd4143aa4ee7f
+index 0000000000000000000000000000000000000000..ad54cffea1a34e14a374572b3b2b9ac8214d9172
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/loader/PluginClasspathBuilder.java
-@@ -0,0 +1,8 @@
+@@ -0,0 +1,31 @@
 +package io.papermc.paper.plugin.provider.loader;
 +
 +import io.papermc.paper.plugin.provider.loader.library.ClassPathLibrary;
++import org.jetbrains.annotations.NotNull;
 +
++/**
++ * Class used for building classpath configurations in plugin loading.
++ */
 +public interface PluginClasspathBuilder {
 +
-+    PluginClasspathBuilder addLibrary(ClassPathLibrary classPathLibrary);
++    /**
++     * Adds a new classpath library to this classpath builder.
++     * <blockquote><pre>{@code
++     * public void classloader(PluginClasspathBuilder classpathBuilder) {
++     *     classpathBuilder.addLibrary(new JarLibrary(Path.of("bob.jar")));
++     *
++     *     MavenLibraryResolver resolver = new MavenLibraryResolver();
++     *     resolver.addDependency(new Dependency(new DefaultArtifact("namespace:identifier:version"), null));
++     *     resolver.addRepository(new RemoteRepository.Builder("my_repo", "default", "https://repo.mymavenrepo.com/repository/maven-public/").build());
++     *
++     *     classpathBuilder.addLibrary(resolver);
++     * }
++     *
++     * }</pre></blockquote>
++     *
++     * @param classPathLibrary library
++     * @return self
++     */
++    @NotNull
++    PluginClasspathBuilder addLibrary(@NotNull ClassPathLibrary classPathLibrary);
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/library/ClassPathLibrary.java b/src/main/java/io/papermc/paper/plugin/provider/loader/library/ClassPathLibrary.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..2e94343f0605c2309472355e059f76988eb3dbec
+index 0000000000000000000000000000000000000000..446c38cbe75ad8993e77dcbd15c47058b682b414
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/loader/library/ClassPathLibrary.java
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,17 @@
 +package io.papermc.paper.plugin.provider.loader.library;
 +
++import org.jetbrains.annotations.NotNull;
++
++/**
++ * Responsible for loading libraries into the LibraryStore.
++ */
 +public interface ClassPathLibrary {
 +
-+    void addToLibraryStore(LibraryStore store) throws LibraryLoadingException;
++    /**
++     * Loads the correct jars into the librarystore.
++     *
++     * @param store library store
++     * @throws LibraryLoadingException if library loading failed for this classpath library
++     */
++    void addToLibraryStore(@NotNull LibraryStore store) throws LibraryLoadingException;
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryLoadingException.java b/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryLoadingException.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..d26a6a97b891858842fa7928ed78ba0ddf1dd5f1
+index 0000000000000000000000000000000000000000..b4ede73e072a00830e0ceaf255aba069b21a757c
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryLoadingException.java
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,15 @@
 +package io.papermc.paper.plugin.provider.loader.library;
 +
++/**
++ * Indicates that an exception has occured while loading a library.
++ */
 +public class LibraryLoadingException extends RuntimeException {
 +
 +    public LibraryLoadingException(String s) {
@@ -348,56 +583,70 @@ index 0000000000000000000000000000000000000000..d26a6a97b891858842fa7928ed78ba0d
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryStore.java b/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryStore.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..5e227c29830355ead3440337ad8b50a426896e88
+index 0000000000000000000000000000000000000000..6c67344660339b24568c1c30eed5ff3804c65bbc
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/loader/library/LibraryStore.java
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,14 @@
 +package io.papermc.paper.plugin.provider.loader.library;
++
++import org.jetbrains.annotations.NotNull;
 +
 +import java.nio.file.Path;
 +
++/**
++ * Represents a storage that stores library jars.
++ */
 +public interface LibraryStore {
 +
-+    void addLibrary(Path library);
++    void addLibrary(@NotNull Path library);
 +
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/JarLibrary.java b/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/JarLibrary.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..d02b80d14b9425f4a27d0efa2f0b41896e3811c6
+index 0000000000000000000000000000000000000000..8abdd019ea03e1ec1107c25dbaf83f6c81d74abd
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/JarLibrary.java
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,34 @@
 +package io.papermc.paper.plugin.provider.loader.library.impl;
 +
 +import io.papermc.paper.plugin.provider.loader.library.ClassPathLibrary;
 +import io.papermc.paper.plugin.provider.loader.library.LibraryLoadingException;
 +import io.papermc.paper.plugin.provider.loader.library.LibraryStore;
++import org.jetbrains.annotations.NotNull;
 +
 +import java.nio.file.Files;
 +import java.nio.file.Path;
 +
++/**
++ * A simple jar library, will error if the jar is not found.
++ */
 +public class JarLibrary implements ClassPathLibrary {
 +
 +    private final Path path;
 +
-+    public JarLibrary(Path path) {
++    /**
++     * Creates a jar library with the given path.
++     *
++     * @param path given path
++     */
++    public JarLibrary(@NotNull Path path) {
 +        this.path = path;
 +    }
 +
 +    @Override
-+    public void addToLibraryStore(LibraryStore store) throws LibraryLoadingException {
++    public void addToLibraryStore(@NotNull LibraryStore store) throws LibraryLoadingException {
 +        if (Files.notExists(this.path)) {
-+            throw new LibraryLoadingException("Could not find library at " + this.path.toString());
++            throw new LibraryLoadingException("Could not find library at " + this.path);
 +        }
-+
++        store.addLibrary(this.path);
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/maven/MavenLibraryResolver.java b/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/maven/MavenLibraryResolver.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..94098da7c38678f4a2069dd47f80bbde3c1ea707
+index 0000000000000000000000000000000000000000..59532a9c8440ae4303afe66dc0bc94b09041e3fc
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/loader/library/impl/maven/MavenLibraryResolver.java
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,119 @@
 +package io.papermc.paper.plugin.provider.loader.library.impl.maven;
 +
 +import io.papermc.paper.plugin.provider.loader.library.ClassPathLibrary;
@@ -427,26 +676,27 @@ index 0000000000000000000000000000000000000000..94098da7c38678f4a2069dd47f80bbde
 +import org.jetbrains.annotations.NotNull;
 +
 +import java.io.File;
-+import java.net.MalformedURLException;
-+import java.net.URL;
 +import java.util.ArrayList;
 +import java.util.List;
 +import java.util.logging.Level;
 +import java.util.logging.Logger;
 +
++/**
++ * A maven library, this allows you to resolve jars from maven repositories.
++ * This class will automatically cache resolved libraries when needed into the libraries directory.
++ */
 +public class MavenLibraryResolver implements ClassPathLibrary {
 +
-+    private Logger logger = Logger.getLogger("MavenLibraryResolver");
++    private static final Logger logger = Logger.getLogger("MavenLibraryResolver");
 +
 +    private final RepositorySystem repository;
 +    private final DefaultRepositorySystemSession session;
 +    private final List<RemoteRepository> repositories = new ArrayList<>();
 +    private final List<Dependency> dependencies = new ArrayList<>();
 +
-+    private DependencyFilter filter;
++    private DependencyFilter filter = null;
 +
 +    public MavenLibraryResolver() {
-+
 +        DefaultServiceLocator locator = MavenRepositorySystemUtils.newServiceLocator();
 +        locator.addService(RepositoryConnectorFactory.class, BasicRepositoryConnectorFactory.class);
 +        locator.addService(TransporterFactory.class, HttpTransporterFactory.class);
@@ -458,32 +708,49 @@ index 0000000000000000000000000000000000000000..94098da7c38678f4a2069dd47f80bbde
 +        this.session.setLocalRepositoryManager(this.repository.newLocalRepositoryManager(this.session, new LocalRepository("libraries")));
 +        this.session.setTransferListener(new AbstractTransferListener() {
 +            @Override
-+            public void transferInitiated(TransferEvent event) throws TransferCancelledException {
-+                MavenLibraryResolver.this.logger.log(Level.INFO, "Downloading {0}", event.getResource().getRepositoryUrl() + event.getResource().getResourceName());
++            public void transferInitiated(@NotNull TransferEvent event) throws TransferCancelledException {
++                logger.log(Level.INFO, "Downloading {0}", event.getResource().getRepositoryUrl() + event.getResource().getResourceName());
 +            }
 +        });
 +        this.session.setReadOnly();
 +    }
 +
-+    public void setLogger(Logger logger) {
-+        this.logger = logger;
-+    }
 +
-+    public void addDependency(Dependency dependency) {
++    /**
++     * Adds the provided dependency to the library resolver.
++     * The dependency from the first valid repository will be chosen.
++     *
++     * @param dependency provided dependency
++     * @see MavenLibraryResolver#addRepository(RemoteRepository)
++     */
++    public void addDependency(@NotNull Dependency dependency) {
 +        this.dependencies.add(dependency);
 +    }
 +
-+    public void addRepository(RemoteRepository remoteRepository) {
++    /**
++     * Adds the provided repository to the library resolver.
++     * The order in which these are added does matter, as dependency resolving will start at the first added
++     * repository.
++     *
++     * @param remoteRepository provided repository
++     */
++    public void addRepository(@NotNull RemoteRepository remoteRepository) {
 +        this.repositories.add(remoteRepository);
 +    }
 +
-+    // Is this supposed to be per repo lookup? Idk it's just grouped up here
-+    public void setFilter(DependencyFilter filter) {
-+        this.filter = filter;
-+    }
++    // Do we want this? We would need to do multiple resolveDependencies calls if we want a filter per repository.
++//    public void setFilter(DependencyFilter filter) {
++//        this.filter = filter;
++//    }
 +
++    /**
++     * Resolves the provided dependencies and adds them to the library store.
++     *
++     * @param store library store
++     * @throws LibraryLoadingException if resolving a dependency failed
++     */
 +    @Override
-+    public void addToLibraryStore(LibraryStore store) throws LibraryLoadingException {
++    public void addToLibraryStore(@NotNull LibraryStore store) throws LibraryLoadingException {
 +        List<RemoteRepository> repos = this.repository.newResolutionRepositories(this.session, this.repositories);
 +
 +        DependencyResult result;
@@ -499,288 +766,38 @@ index 0000000000000000000000000000000000000000..94098da7c38678f4a2069dd47f80bbde
 +        }
 +    }
 +}
-diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/ConfiguredPluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/ConfiguredPluginClassLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..285ee85f0cb05ff19785a69e9b971a763a091405
+index 0000000000000000000000000000000000000000..56faf7465e47be62ba432f5368cda9f01f955507
 --- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
-@@ -0,0 +1,263 @@
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/ConfiguredPluginClassLoader.java
+@@ -0,0 +1,16 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
-+import io.papermc.paper.plugin.provider.PluginProvider;
 +import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
-+import io.papermc.paper.plugin.provider.util.NamespaceChecker;
-+import org.bukkit.Bukkit;
-+import org.bukkit.configuration.serialization.ConfigurationSerializable;
-+import org.bukkit.configuration.serialization.ConfigurationSerialization;
-+import org.bukkit.plugin.PluginDescriptionFile;
-+import org.bukkit.plugin.PluginLoader;
-+import org.bukkit.plugin.SimplePluginManager;
 +import org.bukkit.plugin.java.JavaPlugin;
 +import org.jetbrains.annotations.ApiStatus;
 +import org.jetbrains.annotations.NotNull;
 +
-+import java.io.File;
-+import java.io.IOException;
-+import java.io.InputStream;
-+import java.net.URL;
-+import java.net.URLClassLoader;
-+import java.security.CodeSigner;
-+import java.security.CodeSource;
-+import java.util.Collections;
-+import java.util.Enumeration;
-+import java.util.List;
-+import java.util.Map;
-+import java.util.Set;
-+import java.util.concurrent.ConcurrentHashMap;
-+import java.util.jar.JarEntry;
-+import java.util.jar.JarFile;
-+import java.util.jar.Manifest;
-+import java.util.logging.Logger;
-+
 +@ApiStatus.Internal
-+public class PaperPluginClassLoader extends URLClassLoader {
++public interface ConfiguredPluginClassLoader {
++    PluginConfiguration getConfiguration();
 +
-+    private final PaperPluginClassLoaderStorage loader;
-+    private final ClassLoader libraryLoader;
++    Class<?> loadClass(@NotNull String name, boolean resolve, boolean checkGlobal, boolean checkLibraries) throws ClassNotFoundException;
 +
-+    private final Map<String, Class<?>> loadedClasses = new ConcurrentHashMap<>();
-+
-+    private final PluginProvider<?> pluginProvider;
-+    private final PluginConfiguration pluginConfiguration;
-+    private final Manifest jarManifest;
-+    private final URL jarUrl;
-+
-+    private final Set<String> seenIllegalAccess = Collections.newSetFromMap(new ConcurrentHashMap<>());
-+    private final Logger logger;
-+
-+    static {
-+        ClassLoader.registerAsParallelCapable();
-+    }
-+
-+    public PaperPluginClassLoader(@NotNull PaperPluginClassLoaderStorage loader, PluginProvider<?> pluginProvider, ClassLoader parentLoader, ClassLoader libraryLoader) throws IOException {
-+        super(pluginProvider.getSource().getFileName().toString(), new URL[]{pluginProvider.getSource().toUri().toURL()}, parentLoader);
-+        this.loader = loader;
-+        this.libraryLoader = libraryLoader;
-+
-+        this.pluginProvider = pluginProvider;
-+        // TODO: Are these needed? Want to avoid overhead by converting
-+        this.pluginConfiguration = this.pluginProvider.getConfiguration();
-+        this.jarManifest = this.pluginProvider.file().getManifest();
-+        this.jarUrl = this.pluginProvider.getSource().toUri().toURL();
-+
-+        this.logger = pluginProvider.getLogger();
-+    }
-+
-+    @Override
-+    public URL getResource(String name) {
-+        return this.findResource(name);
-+    }
-+
-+    @Override
-+    public Enumeration<URL> getResources(String name) throws IOException {
-+        return this.findResources(name);
-+    }
-+
-+    @Override
-+    protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-+        return this.loadClass(name, resolve, true, true);
-+    }
-+
-+    // TODO: ((SimplePluginManager) server.getPluginManager()).isTransitiveDepend(description, requester.getDescription())
-+    public Class<?> loadClass(@NotNull String name, boolean resolve, boolean checkGlobal, boolean checkLibraries) throws ClassNotFoundException {
-+        try {
-+            Class<?> result = super.loadClass(name, resolve);
-+
-+            // SPIGOT-6749: Library classes will appear in the above, but we don't want to return them to other plugins
-+            if (checkGlobal || result.getClassLoader() == this) {
-+                return result;
-+            }
-+        } catch (ClassNotFoundException ex) {
-+        }
-+
-+        if (checkLibraries) {
-+            try {
-+                return this.libraryLoader.loadClass(name);
-+            } catch (ClassNotFoundException ex) {
-+            }
-+        }
-+
-+        if (checkGlobal) {
-+            // This ignores the libraries of other plugins, unless they are transitive dependencies.
-+            Class<?> result = this.loader.getClassByName(name, resolve, this.pluginConfiguration, this);  // Paper - prioritize self
-+
-+            if (result != null) {
-+                // If the class was loaded from a library instead of a PluginClassLoader, we can assume that its associated plugin is a transitive dependency and can therefore skip this check.
-+                if (result.getClassLoader() instanceof PaperPluginClassLoader existingClassLoader) {
-+                    PluginConfiguration classLoaderConfig = existingClassLoader.pluginConfiguration;
-+
-+                    String identifier = classLoaderConfig.getIdentifier();
-+                    if (classLoaderConfig != this.pluginConfiguration && !this.seenIllegalAccess.contains(identifier) && !this.pluginConfiguration.isTransitiveDependency(classLoaderConfig)) {
-+                        this.seenIllegalAccess.add(identifier);
-+                        if (this.pluginProvider != null) {
-+                            this.logger.warning("Loaded class '%s' from '%s' which is not a depend or softdepend of this plugin.".formatted(name, classLoaderConfig.getDisplayName()));
-+                        }
-+                    }
-+                }
-+
-+                return result;
-+            }
-+        }
-+
-+        throw new ClassNotFoundException(name);
-+    }
-+
-+    /*
-+    Because of the ugly byte code manipulation, we have to copy the class defining logic so that we can modify the byte array
-+    before the class is loaded.
-+     */
-+    @Override
-+    protected Class<?> findClass(String name) throws ClassNotFoundException {
-+        NamespaceChecker.validateNameSpaceForClassloading(name);
-+
-+        Class<?> result = this.loadedClasses.get(name);
-+        if (result != null) {
-+            return result;
-+        }
-+        JarFile jar = this.pluginProvider.file();
-+
-+        // See UrlClassLoader#findClass(String)
-+        String path = name.replace('.', '/').concat(".class");
-+        JarEntry entry = jar.getJarEntry(path);
-+
-+        if (entry != null) {
-+            // See URLClassLoader#defineClass(String, Resource), this is a re
-+            byte[] classBytes;
-+
-+            try (InputStream is = jar.getInputStream(entry)) {
-+                classBytes = is.readAllBytes();
-+            } catch (IOException ex) {
-+                throw new ClassNotFoundException(name, ex);
-+            }
-+
-+            //classBytes = loader.server.getUnsafe().processClass(description, path, classBytes); TODO: Awful byte manipulation
-+
-+            int dot = name.lastIndexOf('.');
-+            if (dot != -1) {
-+                String pkgName = name.substring(0, dot);
-+                // Get defined package does not correctly handle sealed packages.
-+                if (this.getDefinedPackage(pkgName) == null) {
-+                    try {
-+                        if (this.jarManifest != null) {
-+                            this.definePackage(pkgName, this.jarManifest, this.jarUrl);
-+                        } else {
-+                            this.definePackage(pkgName, null, null, null, null, null, null, null);
-+                        }
-+                    } catch (IllegalArgumentException ex) {
-+                        // parallel-capable class loaders: re-verify in case of a
-+                        // race condition
-+                        if (this.getDefinedPackage(pkgName) == null) {
-+                            // Should never happen
-+                            throw new IllegalStateException("Cannot find package " + pkgName);
-+                        }
-+                    }
-+                }
-+            }
-+
-+            CodeSigner[] signers = entry.getCodeSigners();
-+            CodeSource source = new CodeSource(this.jarUrl, signers);
-+
-+            result = this.defineClass(name, classBytes, 0, classBytes.length, source);
-+        } else {
-+            result = super.findClass(name);
-+        }
-+
-+        this.setClass(result);
-+        this.loadedClasses.put(name, result);
-+
-+        return result;
-+    }
-+
-+    @Override
-+    public void close() throws IOException {
-+        for (Class<?> clazz : this.loadedClasses.values()) {
-+            this.removeClass(clazz);
-+        }
-+
-+        super.close();
-+    }
-+
-+    @Override
-+    public String toString() {
-+        return "PaperPluginClassLoader{" +
-+            "loader=" + this.loader +
-+            ", loadedClasses=" + this.loadedClasses +
-+            ", pluginProvider=" + this.pluginProvider +
-+            ", pluginConfiguration=" + this.pluginConfiguration +
-+            ", jarManifest=" + this.jarManifest +
-+            ", jarUrl=" + this.jarUrl +
-+            ", seenIllegalAccess=" + this.seenIllegalAccess +
-+            '}';
-+    }
-+
-+
-+    // TODO: are we supporting this cringe?
-+    private void setClass(@NotNull final Class<?> clazz) {
-+        if (ConfigurationSerializable.class.isAssignableFrom(clazz)) {
-+            Class<? extends ConfigurationSerializable> serializable = clazz.asSubclass(ConfigurationSerializable.class);
-+            ConfigurationSerialization.registerClass(serializable);
-+        }
-+    }
-+
-+    private void removeClass(@NotNull Class<?> clazz) {
-+        if (ConfigurationSerializable.class.isAssignableFrom(clazz)) {
-+            Class<? extends ConfigurationSerializable> serializable = clazz.asSubclass(ConfigurationSerializable.class);
-+            ConfigurationSerialization.unregisterClass(serializable);
-+        }
-+    }
-+
-+    public void handleLoadPlugin(JavaPlugin javaPlugin) {
-+        PluginLoader pluginLoader = ((SimplePluginManager) Bukkit.getPluginManager()).loader;
-+        //javaPlugin.logger = this.logger; // Paper - set logger
-+        PluginConfiguration config = this.pluginConfiguration;
-+        PluginDescriptionFile pluginDescriptionFile = new PluginDescriptionFile(
-+            config.getIdentifier(),
-+            config.getDisplayName(),
-+            config.getProvides(),
-+            config.getMain(),
-+            "", // Classloader load order api
-+            config.getHardDependencies(),
-+            config.getSoftDependencies(),
-+            config.getLoadBefore(),
-+            config.getVersion(),
-+            config.getRawCommands(),
-+            config.getDescription(),
-+            config.getAuthors(),
-+            config.getContributors(),
-+            config.getWebsite(),
-+            config.getLoggingPrefix(),
-+            config.getLoadOrder(),
-+            config.getPermissions(),
-+            config.getDefaultPermission(),
-+            Set.of(), // Aware api
-+            config.getApiVersion(),
-+            List.of() // Libraries
-+        );
-+
-+        File dataFolder = new File(Bukkit.getPluginsFolder(), pluginDescriptionFile.getName());
-+
-+        javaPlugin.init(pluginLoader, Bukkit.getServer(), pluginDescriptionFile, dataFolder, this.pluginProvider.getSource().resolve(pluginDescriptionFile.getDisplayName()).toFile(), this, config);
-+    }
++    // Called in the constructor, at the very top
++    void init(JavaPlugin plugin);
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoaderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoaderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..e1df8ba447e10e7b6ab79a3f7515fbc9c49e918c
+index 0000000000000000000000000000000000000000..f6a4842e67d3f12fb2e6b97b97139703263d472e
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoaderStorage.java
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,78 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
 +import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
-+import org.bukkit.Bukkit;
-+import org.bukkit.plugin.SimplePluginManager;
-+import org.bukkit.plugin.java.LibraryLoader;
-+import org.bukkit.plugin.java.PluginClassLoader;
++import org.jetbrains.annotations.ApiStatus;
 +import org.jetbrains.annotations.Nullable;
 +
 +import java.util.HashMap;
@@ -788,36 +805,25 @@ index 0000000000000000000000000000000000000000..e1df8ba447e10e7b6ab79a3f7515fbc9
 +import java.util.Map;
 +import java.util.concurrent.CopyOnWriteArrayList;
 +import java.util.concurrent.locks.ReentrantReadWriteLock;
-+import java.util.logging.Logger;
 +
 +/**
-+ * Holds classloaders that other plugin providers might be using.
++ * This is used for connecting multiple classloaders.
 + */
++@ApiStatus.Internal
 +public final class PaperPluginClassLoaderStorage {
 +
-+    private static final Logger LOGGER = java.util.logging.Logger.getLogger("PaperClassLoader");
++    private static final boolean DISABLE_CLASS_PRIORITIZATION = Boolean.getBoolean("Paper.DisableClassPrioritization");
 +
 +    private final Map<String, ReentrantReadWriteLock> classLoadLock = new HashMap<>();
 +    private final Map<String, Integer> classLoadLockCount = new HashMap<>();
-+    public final List<PaperPluginClassLoader> classLoaders = new CopyOnWriteArrayList<>();
-+    public final List<PluginClassLoader> spigotClassLoaders = new CopyOnWriteArrayList<>();
-+    private final LibraryLoader libraryLoader;
++    public final List<ConfiguredPluginClassLoader> classLoaders = new CopyOnWriteArrayList<>();
 +
 +    public static final PaperPluginClassLoaderStorage INSTANCE = new PaperPluginClassLoaderStorage();
 +
 +    public PaperPluginClassLoaderStorage() {
-+
-+        LibraryLoader libraryLoader = null;
-+        try {
-+            libraryLoader = new LibraryLoader(LOGGER);
-+        } catch (NoClassDefFoundError ex) {
-+            // Provided depends were not added back
-+            LOGGER.warning("Could not initialize LibraryLoader (missing dependencies?)");
-+        }
-+        this.libraryLoader = libraryLoader;
 +    }
 +
-+    public Class<?> getClassByName(String name, boolean resolve, PluginConfiguration pluginConfiguration, @Nullable ClassLoader requester) {
++    public Class<?> getClassByName(String name, boolean resolve, PluginConfiguration pluginConfiguration, @Nullable ConfiguredPluginClassLoader requester) {
 +        // make MT safe
 +        java.util.concurrent.locks.ReentrantReadWriteLock lock;
 +        synchronized (this.classLoadLock) {
@@ -827,23 +833,15 @@ index 0000000000000000000000000000000000000000..e1df8ba447e10e7b6ab79a3f7515fbc9
 +        lock.writeLock().lock();
 +
 +        try {
-+//            if (!DISABLE_CLASS_PRIORITIZATION && requester != null) {
-+//                try {
-+//                    return requester.loadClass0(name, false, false, ((SimplePluginManager) server.getPluginManager()).isTransitiveDepend(description, requester.getDescription()));
-+//                } catch (ClassNotFoundException cnfe) {
-+//                }
-+//            }
-+            // Paper end
-+            for (PaperPluginClassLoader loader : this.classLoaders) {
++            if (!DISABLE_CLASS_PRIORITIZATION && requester != null) {
 +                try {
-+                    return loader.loadClass(name, resolve, false, true);
++                    return requester.loadClass(name, false, false, pluginConfiguration.isTransitiveDependency(requester.getConfiguration()));
 +                } catch (ClassNotFoundException cnfe) {
 +                }
 +            }
-+            SimplePluginManager manager = ((SimplePluginManager) Bukkit.getServer().getPluginManager());
-+            for (PluginClassLoader loader : this.spigotClassLoaders) {
++            for (ConfiguredPluginClassLoader loader : this.classLoaders) {
 +                try {
-+                    return loader.loadClass0(name, resolve, false, manager.isTransitiveDepend(pluginConfiguration, loader.getPlugin().getDescription()));
++                    return loader.loadClass(name, resolve, false, pluginConfiguration.isTransitiveDependency(loader.getConfiguration()));
 +                } catch (ClassNotFoundException cnfe) {
 +                }
 +            }
@@ -861,99 +859,64 @@ index 0000000000000000000000000000000000000000..e1df8ba447e10e7b6ab79a3f7515fbc9
 +        return null;
 +    }
 +
-+    public LibraryLoader getLibraryLoader() {
-+        return this.libraryLoader;
-+    }
 +
-+    public void add(PaperPluginClassLoader classLoader) {
++    public void add(ConfiguredPluginClassLoader classLoader) {
 +        this.classLoaders.add(classLoader);
 +    }
 +
-+    public void add(PluginClassLoader classLoader) {
-+        this.spigotClassLoaders.add(classLoader);
++    public void remove(ConfiguredPluginClassLoader loader) {
++        this.classLoaders.remove(loader);
 +    }
 +
-+    public void remove(PluginClassLoader loader) {
-+        this.spigotClassLoaders.remove(loader);
-+    }
-+
-+    public boolean contains(PluginClassLoader pluginLoader) {
-+        return this.spigotClassLoaders.contains(pluginLoader);
++    public boolean contains(ConfiguredPluginClassLoader pluginLoader) {
++        return this.classLoaders.contains(pluginLoader);
 +    }
 +}
-diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/bytecode/ClassloaderBytecodeModifier.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/bytecode/ClassloaderBytecodeModifier.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..3fad4675cdb9aa35475e73ddfd508f0910f02969
+index 0000000000000000000000000000000000000000..e58d18525fe590afaa4f5a305859c4ba3cf1578d
 --- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java
-@@ -0,0 +1,38 @@
-+package io.papermc.paper.plugin.provider.service.classloader;
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/bytecode/ClassloaderBytecodeModifier.java
+@@ -0,0 +1,26 @@
++package io.papermc.paper.plugin.provider.service.classloader.bytecode;
 +
-+import io.papermc.paper.plugin.provider.util.NamespaceChecker;
-+import io.papermc.paper.plugin.provider.PluginProvider;
-+
-+import java.io.IOException;
-+import java.net.MalformedURLException;
-+import java.net.URL;
-+import java.net.URLClassLoader;
-+import java.util.Enumeration;
-+
-+public class PaperSimplePluginClassLoader extends URLClassLoader {
-+
-+    static {
-+        ClassLoader.registerAsParallelCapable();
-+    }
-+
-+    public PaperSimplePluginClassLoader(PluginProvider<?> pluginProvider, ClassLoader parentLoader) throws MalformedURLException {
-+        super(pluginProvider.getSource().getFileName().toString(), new URL[]{pluginProvider.getSource().toUri().toURL()}, parentLoader);
-+    }
-+
-+    @Override
-+    public URL getResource(String name) {
-+        return this.findResource(name);
-+    }
-+
-+    @Override
-+    public Enumeration<URL> getResources(String name) throws IOException {
-+        return this.findResources(name);
-+    }
-+
-+    @Override
-+    protected Class<?> findClass(String name) throws ClassNotFoundException {
-+        NamespaceChecker.validateNameSpaceForClassloading(name);
-+        return super.findClass(name);
-+    }
-+
-+}
-diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/ProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/storage/ProviderStorage.java
-new file mode 100644
-index 0000000000000000000000000000000000000000..2b2ea4e6d00039770380323242199f8d74392b01
---- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/provider/service/storage/ProviderStorage.java
-@@ -0,0 +1,13 @@
-+package io.papermc.paper.plugin.provider.service.storage;
-+
-+import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
 +import org.jetbrains.annotations.ApiStatus;
 +
-+public interface ProviderStorage<T> {
++@ApiStatus.Internal
++public abstract class ClassloaderBytecodeModifier {
 +
-+    void register(PluginProvider<T> provider);
++    public static ClassloaderBytecodeModifier INSTANCE;
 +
-+    @ApiStatus.Internal
-+    Iterable<PluginProvider<T>> getRegisteredProviders();
++    public static void setInstance(ClassloaderBytecodeModifier instance) {
++        if (INSTANCE != null)  {
++            throw new IllegalStateException();
++        }
++
++        INSTANCE = instance;
++    }
++
++    public static ClassloaderBytecodeModifier getInstance() {
++        return INSTANCE;
++    }
++
++
++    public abstract byte[] modify(PluginConfiguration config, byte[] bytecode);
 +
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/util/NamespaceChecker.java b/src/main/java/io/papermc/paper/plugin/provider/util/NamespaceChecker.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..94d1a945ff11e195057693eb38445f8f04ecc1e8
+index 0000000000000000000000000000000000000000..1726825a808f77bef5a3d02fd89da1f717a03041
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/util/NamespaceChecker.java
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,37 @@
 +package io.papermc.paper.plugin.provider.util;
 +
-+public class NamespaceChecker {
++import org.jetbrains.annotations.ApiStatus;
++import org.jetbrains.annotations.NotNull;
 +
++@ApiStatus.Internal
++public class NamespaceChecker {
 +
 +    private static final String[] QUICK_INVALID_NAMESPACES = {
 +        "net.minecraft.",
@@ -968,13 +931,13 @@ index 0000000000000000000000000000000000000000..94d1a945ff11e195057693eb38445f8f
 +     *
 +     * @param name namespace
 +     */
-+    public static void validateNameSpaceForClassloading(String name) throws ClassNotFoundException {
++    public static void validateNameSpaceForClassloading(@NotNull String name) throws ClassNotFoundException {
 +        if (isValidNameSpace(name)) {
 +            throw new ClassNotFoundException(name);
 +        }
 +    }
 +
-+    public static boolean isValidNameSpace(String name) {
++    public static boolean isValidNameSpace(@NotNull String name) {
 +        for (String string : QUICK_INVALID_NAMESPACES) {
 +            if (name.startsWith(string)) {
 +                return false;
@@ -984,20 +947,95 @@ index 0000000000000000000000000000000000000000..94d1a945ff11e195057693eb38445f8f
 +        return false;
 +    }
 +}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/util/ProviderUtil.java b/src/main/java/io/papermc/paper/plugin/provider/util/ProviderUtil.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..06fb087e8ee7f28b638a9f8819d3a0d272a65a9c
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/util/ProviderUtil.java
+@@ -0,0 +1,48 @@
++package io.papermc.paper.plugin.provider.util;
++
++import com.destroystokyo.paper.util.SneakyThrow;
++import org.jetbrains.annotations.ApiStatus;
++import org.jetbrains.annotations.NotNull;
++
++import java.util.function.Consumer;
++
++@ApiStatus.Internal
++public class ProviderUtil {
++
++    public static <T> T loadClass(@NotNull String clazz, @NotNull Class<T> classType, @NotNull ClassLoader loader) {
++        return loadClass(clazz, classType, loader, null);
++    }
++
++    public static <T> T loadClass(@NotNull String clazz, @NotNull Class<T> classType, @NotNull ClassLoader loader, @NotNull Runnable onError) {
++        try {
++            T clazzInstance;
++
++            try {
++                Class<?> jarClass = Class.forName(clazz, true, loader);
++
++                Class<? extends T> pluginClass;
++                try {
++                    pluginClass = jarClass.asSubclass(classType);
++                } catch (ClassCastException ex) {
++                    throw new ClassCastException("class '%s' does not extend '%s'".formatted(clazz, classType));
++                }
++
++                clazzInstance = pluginClass.getDeclaredConstructor().newInstance();
++            } catch (IllegalAccessException exception) {
++                throw new RuntimeException("No public constructor");
++            } catch (InstantiationException exception) {
++                throw new RuntimeException("Abnormal plugin type", exception);
++            }
++
++            return clazzInstance;
++        } catch (Throwable e) {
++            if (onError != null) {
++                onError.run();
++            }
++            SneakyThrow.sneaky(e);
++        }
++
++        throw new AssertionError(); // Shouldn't happen
++    }
++
++}
 diff --git a/src/main/java/io/papermc/paper/registry/RegistryAccess.java b/src/main/java/io/papermc/paper/registry/RegistryAccess.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..f26486d188fa8f120b5322ac568c422a881f584f
+index 0000000000000000000000000000000000000000..ce66c664003e80087df88bded37ef17bd398bf85
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/registry/RegistryAccess.java
-@@ -0,0 +1,8 @@
+@@ -0,0 +1,16 @@
 +package io.papermc.paper.registry;
++
++import org.jetbrains.annotations.NotNull;
 +
 +public class RegistryAccess {
 +
++    /**
++     * Stub
++     *
++     * @return
++     */
++    @NotNull
 +    public static RegistryAccess getInstance() {
 +        return new RegistryAccess();
 +    }
 +}
+diff --git a/src/main/java/org/bukkit/command/PluginCommand.java b/src/main/java/org/bukkit/command/PluginCommand.java
+index 1dbbc244309043b18c1d71707c4fb066c0d0e02d..08d3ff24d5318b0c77d6467bcb705bffac202842 100644
+--- a/src/main/java/org/bukkit/command/PluginCommand.java
++++ b/src/main/java/org/bukkit/command/PluginCommand.java
+@@ -14,7 +14,7 @@ public final class PluginCommand extends Command implements PluginIdentifiableCo
+     private CommandExecutor executor;
+     private TabCompleter completer;
+ 
+-    protected PluginCommand(@NotNull String name, @NotNull Plugin owner) {
++    public PluginCommand(@NotNull String name, @NotNull Plugin owner) { // Paper
+         super(name);
+         this.executor = owner;
+         this.owningPlugin = owner;
 diff --git a/src/main/java/org/bukkit/command/SimpleCommandMap.java b/src/main/java/org/bukkit/command/SimpleCommandMap.java
 index b8623575b1c1b565560c2dd6438190716845a652..785952d60df7c0ab7b247ba81d1970b5a90e5340 100644
 --- a/src/main/java/org/bukkit/command/SimpleCommandMap.java
@@ -1012,20 +1050,32 @@ index b8623575b1c1b565560c2dd6438190716845a652..785952d60df7c0ab7b247ba81d1970b5
      }
  
 diff --git a/src/main/java/org/bukkit/plugin/Plugin.java b/src/main/java/org/bukkit/plugin/Plugin.java
-index 08aef59d8443038771704d9587e31f299e587307..3948cebb552ae1873421a8354c686a0b4afff3a7 100644
+index 08aef59d8443038771704d9587e31f299e587307..6d3acdc3391495e7b05bcc52923ac9009e952e6e 100644
 --- a/src/main/java/org/bukkit/plugin/Plugin.java
 +++ b/src/main/java/org/bukkit/plugin/Plugin.java
-@@ -34,6 +34,8 @@ public interface Plugin extends TabExecutor {
+@@ -30,10 +30,20 @@ public interface Plugin extends TabExecutor {
+      * Returns the plugin.yaml file containing the details for this plugin
+      *
+      * @return Contents of the plugin.yaml file
++     * @deprecated May be inaccurate due to different plugin implementations.
++     * @see Plugin#getConfiguration()
+      */
++    @Deprecated // Paper
      @NotNull
      public PluginDescriptionFile getDescription();
  
++    /**
++     * Gets the plugin configuration for this plugin.
++     * @return configuration
++     */
++    @NotNull
 +    io.papermc.paper.plugin.provider.configuration.PluginConfiguration getConfiguration();
 +
      /**
       * Gets a {@link FileConfiguration} for this plugin, read through
       * "config.yml"
 diff --git a/src/main/java/org/bukkit/plugin/PluginDescriptionFile.java b/src/main/java/org/bukkit/plugin/PluginDescriptionFile.java
-index 0c9f4d1e9104fa6951114c1f9ec954dfcc749196..6a4c6e77176a17e2958a4e3fcd0604eac47c55bb 100644
+index 0c9f4d1e9104fa6951114c1f9ec954dfcc749196..f570eb57b155b5f0f2302a365df483a0ce1d22d5 100644
 --- a/src/main/java/org/bukkit/plugin/PluginDescriptionFile.java
 +++ b/src/main/java/org/bukkit/plugin/PluginDescriptionFile.java
 @@ -194,7 +194,7 @@ import org.yaml.snakeyaml.nodes.Tag;
@@ -1037,11 +1087,15 @@ index 0c9f4d1e9104fa6951114c1f9ec954dfcc749196..6a4c6e77176a17e2958a4e3fcd0604ea
      private static final Pattern VALID_NAME = Pattern.compile("^[A-Za-z0-9 _.-]+$");
      private static final ThreadLocal<Yaml> YAML = new ThreadLocal<Yaml>() {
          @Override
-@@ -254,6 +254,31 @@ public final class PluginDescriptionFile {
+@@ -254,6 +254,35 @@ public final class PluginDescriptionFile {
      private Set<PluginAwareness> awareness = ImmutableSet.of();
      private String apiVersion = null;
      private List<String> libraries = ImmutableList.of();
 +    // Paper start - oh my goddddd
++    /**
++     * Don't use this.
++     */
++    @org.jetbrains.annotations.ApiStatus.Internal
 +    public PluginDescriptionFile(String rawName, String name, List<String> provides, String main, String classLoaderOf, List<String> depend, List<String> softDepend, List<String> loadBefore, String version, Map<String, Map<String, Object>> commands, String description, List<String> authors, List<String> contributors, String website, String prefix, PluginLoadOrder order, List<Permission> permissions, PermissionDefault defaultPerm, Set<PluginAwareness> awareness, String apiVersion, List<String> libraries) {
 +        this.rawName = rawName;
 +        this.name = name;
@@ -1069,20 +1123,50 @@ index 0c9f4d1e9104fa6951114c1f9ec954dfcc749196..6a4c6e77176a17e2958a4e3fcd0604ea
  
      public PluginDescriptionFile(@NotNull final InputStream stream) throws InvalidDescriptionException {
          loadMap(asMap(YAML.get().load(stream)));
-@@ -1270,4 +1295,11 @@ public final class PluginDescriptionFile {
+@@ -365,8 +394,7 @@ public final class PluginDescriptionFile {
+      *
+      * @return the version of the plugin
+      */
+-    @NotNull
+-    public String getVersion() {
++    public @NotNull String getVersion() {
+         return version;
+     }
+ 
+@@ -392,8 +420,7 @@ public final class PluginDescriptionFile {
+      *
+      * @return the fully qualified main class for the plugin
+      */
+-    @NotNull
+-    public String getMain() {
++    public @NotNull String getMain() {
+         return main;
+     }
+ 
+@@ -412,8 +439,7 @@ public final class PluginDescriptionFile {
+      *
+      * @return description of this plugin, or null if not specified
+      */
+-    @Nullable
+-    public String getDescription() {
++    public @NotNull String getDescription() {
+         return description;
+     }
+ 
+@@ -1270,4 +1296,11 @@ public final class PluginDescriptionFile {
      public String getRawName() {
          return rawName;
      }
 +    // Paper
++    @NotNull
 +    @Override
 +    public PluginDescriptionFile spigotDescription() {
 +        return this;
 +    }
-+
 +    // Paper end
  }
 diff --git a/src/main/java/org/bukkit/plugin/SimplePluginManager.java b/src/main/java/org/bukkit/plugin/SimplePluginManager.java
-index ed07f5820281b139739f673fa4e25171de81b894..bf59c122e965224b3539cfbdcdac09a043b28a7b 100644
+index ed07f5820281b139739f673fa4e25171de81b894..19f40e389afce2ff8c8dc6820f3534882099d983 100644
 --- a/src/main/java/org/bukkit/plugin/SimplePluginManager.java
 +++ b/src/main/java/org/bukkit/plugin/SimplePluginManager.java
 @@ -55,6 +55,8 @@ public final class SimplePluginManager implements PluginManager {
@@ -1102,7 +1186,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..bf59c122e965224b3539cfbdcdac09a0
              } catch (NoSuchMethodException ex) {
                  String className = loader.getName();
  
-@@ -410,7 +413,11 @@ public final class SimplePluginManager implements PluginManager {
+@@ -410,7 +413,12 @@ public final class SimplePluginManager implements PluginManager {
                  result = loader.loadPlugin(file);
              }
          }
@@ -1110,12 +1194,13 @@ index ed07f5820281b139739f673fa4e25171de81b894..bf59c122e965224b3539cfbdcdac09a0
 +    // Paper start
 +        return loadPlugin(result);
 +    }
++    @org.jetbrains.annotations.ApiStatus.Internal
 +    public synchronized Plugin loadPlugin(@Nullable Plugin result) throws UnknownDependencyException {
 +    // Paper end
          if (result != null) {
              plugins.add(result);
              lookupNames.put(result.getDescription().getName().toLowerCase(java.util.Locale.ENGLISH), result); // Paper
-@@ -923,13 +930,17 @@ public final class SimplePluginManager implements PluginManager {
+@@ -923,13 +931,17 @@ public final class SimplePluginManager implements PluginManager {
          return new HashSet<Permission>(permissions.values());
      }
  
@@ -1138,10 +1223,10 @@ index ed07f5820281b139739f673fa4e25171de81b894..bf59c122e965224b3539cfbdcdac09a0
              }
              for (String provided : depend.getProvides()) {
 diff --git a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java b/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
-index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..28d9c533260c77262628b6e52da73df001eed752 100644
+index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..1d14ce402a05749e45c62c9ed5faffb0b14cf143 100644
 --- a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
 +++ b/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
-@@ -38,6 +38,7 @@ public abstract class JavaPlugin extends PluginBase {
+@@ -38,19 +38,21 @@ public abstract class JavaPlugin extends PluginBase {
      private Server server = null;
      private File file = null;
      private PluginDescriptionFile description = null;
@@ -1149,27 +1234,26 @@ index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..28d9c533260c77262628b6e52da73df0
      private File dataFolder = null;
      private ClassLoader classLoader = null;
      private boolean naggable = true;
-@@ -47,10 +48,16 @@ public abstract class JavaPlugin extends PluginBase {
+     private FileConfiguration newConfig = null;
+     private File configFile = null;
+-    Logger logger = null; // Paper - PluginLogger -> Logger, package-private
++    public Logger logger = null; // Paper - PluginLogger -> Logger, package-private, public
  
      public JavaPlugin() {
-         final ClassLoader classLoader = this.getClass().getClassLoader();
+-        final ClassLoader classLoader = this.getClass().getClassLoader();
 -        if (!(classLoader instanceof PluginClassLoader)) {
 -            throw new IllegalStateException("JavaPlugin requires " + PluginClassLoader.class.getName());
 +        // Paper start
-+        // TODO Init paper plugins
-+        if (classLoader instanceof PluginClassLoader pluginClassLoader) {
-+            ((PluginClassLoader) classLoader).initialize(this);
-+        } else if (classLoader instanceof io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoader paperPluginClassLoader) {
-+            paperPluginClassLoader.handleLoadPlugin(this);
++        if (this.getClass().getClassLoader() instanceof io.papermc.paper.plugin.provider.service.classloader.ConfiguredPluginClassLoader configuredPluginClassLoader) {
++            configuredPluginClassLoader.init(this);
 +        } else {
 +            throw new IllegalStateException("JavaPlugin requires to be created by a valid classloader.");
          }
 -        ((PluginClassLoader) classLoader).initialize(this);
-+        // Paper end
      }
  
      protected JavaPlugin(@NotNull final JavaPluginLoader loader, @NotNull final PluginDescriptionFile description, @NotNull final File dataFolder, @NotNull final File file) {
-@@ -127,6 +134,11 @@ public abstract class JavaPlugin extends PluginBase {
+@@ -127,6 +129,11 @@ public abstract class JavaPlugin extends PluginBase {
          return description;
      }
  
@@ -1181,7 +1265,7 @@ index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..28d9c533260c77262628b6e52da73df0
      @NotNull
      @Override
      public FileConfiguration getConfig() {
-@@ -268,8 +280,12 @@ public abstract class JavaPlugin extends PluginBase {
+@@ -268,8 +275,12 @@ public abstract class JavaPlugin extends PluginBase {
          }
      }
  
@@ -1196,7 +1280,7 @@ index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..28d9c533260c77262628b6e52da73df0
          this.loader = loader;
          this.server = server;
          this.file = file;
-@@ -281,6 +297,7 @@ public abstract class JavaPlugin extends PluginBase {
+@@ -281,6 +292,7 @@ public abstract class JavaPlugin extends PluginBase {
          if (this.logger == null) {
              this.logger = com.destroystokyo.paper.utils.PaperPluginLogger.getLogger(this.description);
          }
@@ -1205,19 +1289,57 @@ index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..28d9c533260c77262628b6e52da73df0
      }
  
 diff --git a/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java b/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java
-index 8ff78fad47f6086aa289e32590f4fbec24b3d500..6db99a156569da47d5ffba1bb50b6012f310fb19 100644
+index 8ff78fad47f6086aa289e32590f4fbec24b3d500..e5578d90fc628028cb1edfb5af35d764bad807f8 100644
 --- a/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java
 +++ b/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java
-@@ -55,7 +55,7 @@ public final class JavaPluginLoader implements PluginLoader {
+@@ -5,27 +5,25 @@ import java.io.File;
+ import java.io.FileNotFoundException;
+ import java.io.IOException;
+ import java.io.InputStream;
+-import java.lang.reflect.InvocationTargetException;
+ import java.lang.reflect.Method;
+ import java.util.Arrays;
+ import java.util.Collection;
+ import java.util.HashMap;
+ import java.util.HashSet;
+-import java.util.List;
+ import java.util.Map;
+ import java.util.Set;
+-import java.util.concurrent.CopyOnWriteArrayList;
+ import java.util.jar.JarEntry;
+ import java.util.jar.JarFile;
+ import java.util.logging.Level;
+ import java.util.regex.Pattern;
++
++import io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoaderStorage;
+ import org.bukkit.Server;
+ import org.bukkit.Warning;
+ import org.bukkit.Warning.WarningState;
+ import org.bukkit.configuration.serialization.ConfigurationSerializable;
+ import org.bukkit.configuration.serialization.ConfigurationSerialization;
+ import org.bukkit.event.Event;
+-import org.bukkit.event.EventException;
+ import org.bukkit.event.EventHandler;
+ import org.bukkit.event.Listener;
+ import org.bukkit.event.server.PluginDisableEvent;
+@@ -43,7 +41,6 @@ import org.bukkit.plugin.TimedRegisteredListener;
+ import org.bukkit.plugin.UnknownDependencyException;
+ import org.jetbrains.annotations.NotNull;
+ import org.jetbrains.annotations.Nullable;
+-import org.spigotmc.CustomTimingsHandler; // Spigot
+ import org.yaml.snakeyaml.error.YAMLException;
+ 
+ /**
+@@ -55,7 +52,7 @@ public final class JavaPluginLoader implements PluginLoader {
      private final Pattern[] fileFilters = new Pattern[]{Pattern.compile("\\.jar$")};
      private final Map<String, java.util.concurrent.locks.ReentrantReadWriteLock> classLoadLock = new java.util.HashMap<String, java.util.concurrent.locks.ReentrantReadWriteLock>(); // Paper
      private final Map<String, Integer> classLoadLockCount = new java.util.HashMap<String, Integer>(); // Paper
 -    private final List<PluginClassLoader> loaders = new CopyOnWriteArrayList<PluginClassLoader>();
-+    public final io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoaderStorage loaders = io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoaderStorage.INSTANCE; // Paper
++    public final PaperPluginClassLoaderStorage loaders = PaperPluginClassLoaderStorage.INSTANCE; // Paper
      private final LibraryLoader libraryLoader;
  
      /**
-@@ -93,6 +93,12 @@ public final class JavaPluginLoader implements PluginLoader {
+@@ -93,6 +90,12 @@ public final class JavaPluginLoader implements PluginLoader {
          } catch (InvalidDescriptionException ex) {
              throw new InvalidPluginException(ex);
          }
@@ -1230,7 +1352,7 @@ index 8ff78fad47f6086aa289e32590f4fbec24b3d500..6db99a156569da47d5ffba1bb50b6012
  
          final File parentFile = this.server.getPluginsFolder(); // Paper
          final File dataFolder = new File(parentFile, description.getName());
-@@ -214,6 +220,7 @@ public final class JavaPluginLoader implements PluginLoader {
+@@ -214,6 +217,7 @@ public final class JavaPluginLoader implements PluginLoader {
          return getClassByName(name, resolve, description, null);
      }
      Class<?> getClassByName(final String name, boolean resolve, PluginDescriptionFile description, PluginClassLoader requester) {
@@ -1238,7 +1360,7 @@ index 8ff78fad47f6086aa289e32590f4fbec24b3d500..6db99a156569da47d5ffba1bb50b6012
          // Paper end
          // Paper start - make MT safe
          java.util.concurrent.locks.ReentrantReadWriteLock lock;
-@@ -230,12 +237,7 @@ public final class JavaPluginLoader implements PluginLoader {
+@@ -230,12 +234,7 @@ public final class JavaPluginLoader implements PluginLoader {
              }
              // Paper end
          // Paper end
@@ -1252,7 +1374,7 @@ index 8ff78fad47f6086aa289e32590f4fbec24b3d500..6db99a156569da47d5ffba1bb50b6012
          // Paper start - make MT safe
          } finally {
              synchronized (classLoadLock) {
-@@ -359,12 +361,14 @@ public final class JavaPluginLoader implements PluginLoader {
+@@ -359,12 +358,14 @@ public final class JavaPluginLoader implements PluginLoader {
  
              JavaPlugin jPlugin = (JavaPlugin) plugin;
  
@@ -1281,15 +1403,63 @@ index 6d634b0ea813ccb19f1562a7d0e5a59cea4eab21..4eec9316e4447701732c944fa84c64a0
  
      private final Logger logger;
 diff --git a/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java b/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java
-index 345394132df70593800127d34a38f8f8a4dafe00..de2f360f4c5073406db9e80185fecc4bf5179126 100644
+index 345394132df70593800127d34a38f8f8a4dafe00..5ad4164889c06a2d49529bde1de0deb0d8cde2f4 100644
 --- a/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java
 +++ b/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java
-@@ -103,7 +103,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
-         return loadClass0(name, resolve, true, true);
+@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Nullable;
+ /**
+  * A ClassLoader for plugins, to allow shared classes across multiple plugins
+  */
+-public final class PluginClassLoader extends URLClassLoader { // Spigot
++public final class PluginClassLoader extends URLClassLoader implements io.papermc.paper.plugin.provider.service.classloader.ConfiguredPluginClassLoader { // Spigot // Paper
+     public JavaPlugin getPlugin() { return plugin; } // Spigot
+     private final JavaPluginLoader loader;
+     private final Map<String, Class<?>> classes = new ConcurrentHashMap<String, Class<?>>();
+@@ -97,6 +97,21 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+     public Enumeration<URL> getResources(String name) throws IOException {
+         return findResources(name);
+     }
++    // Paper start
++    @Override
++    public Class<?> loadClass(@NotNull String name, boolean resolve, boolean checkGlobal, boolean checkLibraries) throws ClassNotFoundException {
++        return this.loadClass0(name, resolve, checkGlobal, checkLibraries);
++    }
++    @Override
++    public io.papermc.paper.plugin.provider.configuration.PluginConfiguration getConfiguration() {
++        return this.description;
++    }
++
++    @Override
++    public void init(JavaPlugin plugin) {
++        this.initialize(plugin);
++    }
++    // Paper end
+ 
+     @Override
+     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+@@ -222,7 +237,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+         return classes.values();
      }
  
--    Class<?> loadClass0(@NotNull String name, boolean resolve, boolean checkGlobal, boolean checkLibraries) throws ClassNotFoundException {
-+    public Class<?> loadClass0(@NotNull String name, boolean resolve, boolean checkGlobal, boolean checkLibraries) throws ClassNotFoundException { // Paper
-         try {
-             Class<?> result = super.loadClass(name, resolve);
+-    synchronized void initialize(@NotNull JavaPlugin javaPlugin) {
++    public synchronized void initialize(@NotNull JavaPlugin javaPlugin) { // Paper
+         Preconditions.checkArgument(javaPlugin != null, "Initializing plugin cannot be null");
+         Preconditions.checkArgument(javaPlugin.getClass().getClassLoader() == this, "Cannot initialize plugin outside of this class loader");
+         if (this.plugin != null || this.pluginInit != null) {
+diff --git a/src/test/java/org/bukkit/plugin/TestPlugin.java b/src/test/java/org/bukkit/plugin/TestPlugin.java
+index a8be3e23e3e280ad301d9530de50028515612966..5395da02ddcceacc4186647c8c87cfbc061f3aae 100644
+--- a/src/test/java/org/bukkit/plugin/TestPlugin.java
++++ b/src/test/java/org/bukkit/plugin/TestPlugin.java
+@@ -32,6 +32,12 @@ public class TestPlugin extends PluginBase {
+     public PluginDescriptionFile getDescription() {
+         return new PluginDescriptionFile(pluginName, "1.0", "test.test");
+     }
++    // Paper start
++    @Override
++    public io.papermc.paper.plugin.provider.configuration.PluginConfiguration getConfiguration() {
++        return getDescription();
++    }
++    // Paper end
  
+     @Override
+     public FileConfiguration getConfig() {
