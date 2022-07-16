@@ -52,6 +52,62 @@ index 76f2cb9cd99cad2a9484eab2becd8c36f1dd91b3..04cc721f95bfdf861f828cc853f7b8d1
      }
  
      @Override
+diff --git a/src/main/java/io/papermc/paper/plugin/PaperPluginManager.java b/src/main/java/io/papermc/paper/plugin/PaperPluginManager.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..3a7c44c257abffa627e40d0c42570615f6668ea5
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/PaperPluginManager.java
+@@ -0,0 +1,50 @@
++package io.papermc.paper.plugin;
++
++import org.bukkit.plugin.InvalidPluginException;
++import org.bukkit.plugin.Plugin;
++import org.bukkit.plugin.UnknownDependencyException;
++import org.jetbrains.annotations.ApiStatus;
++import org.jetbrains.annotations.Contract;
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
++
++import java.io.File;
++
++// Used to interface with the paper plugin manager.
++@ApiStatus.Internal
++public interface PaperPluginManager {
++
++    @Nullable
++    Plugin getPlugin(@NotNull String name);
++
++
++    @NotNull
++    Plugin[] getPlugins();
++
++
++    boolean isPluginEnabled(@NotNull String name);
++
++
++    @Contract("null -> false")
++    boolean isPluginEnabled(@Nullable Plugin plugin);
++
++    void loadPlugin(@NotNull Plugin plugin);
++
++    @Nullable
++    Plugin loadPlugin(@NotNull File file) throws InvalidPluginException, UnknownDependencyException;
++
++
++    @NotNull
++    Plugin[] loadPlugins(@NotNull File directory);
++
++
++    void disablePlugins();
++
++    void clearPlugins();
++
++
++    void enablePlugin(@NotNull Plugin plugin);
++
++
++    void disablePlugin(@NotNull Plugin plugin);
++}
 diff --git a/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrap.java b/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrap.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..721cdeacdbc74c23811fc0119e213e1d8df92275
@@ -1050,7 +1106,7 @@ index b8623575b1c1b565560c2dd6438190716845a652..785952d60df7c0ab7b247ba81d1970b5
      }
  
 diff --git a/src/main/java/org/bukkit/plugin/Plugin.java b/src/main/java/org/bukkit/plugin/Plugin.java
-index 08aef59d8443038771704d9587e31f299e587307..6d3acdc3391495e7b05bcc52923ac9009e952e6e 100644
+index 08aef59d8443038771704d9587e31f299e587307..cdf9db387de75eb8d7dc24b4c03aefa9532639b3 100644
 --- a/src/main/java/org/bukkit/plugin/Plugin.java
 +++ b/src/main/java/org/bukkit/plugin/Plugin.java
 @@ -30,10 +30,20 @@ public interface Plugin extends TabExecutor {
@@ -1074,6 +1130,17 @@ index 08aef59d8443038771704d9587e31f299e587307..6d3acdc3391495e7b05bcc52923ac900
      /**
       * Gets a {@link FileConfiguration} for this plugin, read through
       * "config.yml"
+@@ -92,8 +102,10 @@ public interface Plugin extends TabExecutor {
+     /**
+      * Gets the associated PluginLoader responsible for this plugin
+      *
++     * @deprecated
+      * @return PluginLoader that controls this plugin
+      */
++    @Deprecated
+     @NotNull
+     public PluginLoader getPluginLoader();
+ 
 diff --git a/src/main/java/org/bukkit/plugin/PluginDescriptionFile.java b/src/main/java/org/bukkit/plugin/PluginDescriptionFile.java
 index 0c9f4d1e9104fa6951114c1f9ec954dfcc749196..f570eb57b155b5f0f2302a365df483a0ce1d22d5 100644
 --- a/src/main/java/org/bukkit/plugin/PluginDescriptionFile.java
@@ -1166,10 +1233,18 @@ index 0c9f4d1e9104fa6951114c1f9ec954dfcc749196..f570eb57b155b5f0f2302a365df483a0
 +    // Paper end
  }
 diff --git a/src/main/java/org/bukkit/plugin/SimplePluginManager.java b/src/main/java/org/bukkit/plugin/SimplePluginManager.java
-index ed07f5820281b139739f673fa4e25171de81b894..19f40e389afce2ff8c8dc6820f3534882099d983 100644
+index ed07f5820281b139739f673fa4e25171de81b894..70b1db50429ea6b7242e34d634ced209786ac203 100644
 --- a/src/main/java/org/bukkit/plugin/SimplePluginManager.java
 +++ b/src/main/java/org/bukkit/plugin/SimplePluginManager.java
-@@ -55,6 +55,8 @@ public final class SimplePluginManager implements PluginManager {
+@@ -43,6 +43,7 @@ import org.jetbrains.annotations.Nullable;
+  * Handles all plugin management from the Server
+  */
+ public final class SimplePluginManager implements PluginManager {
++    public io.papermc.paper.plugin.PaperPluginManager pluginManager;
+     private final Server server;
+     private final Map<Pattern, PluginLoader> fileAssociations = new HashMap<Pattern, PluginLoader>();
+     private final List<Plugin> plugins = new ArrayList<Plugin>();
+@@ -55,6 +56,8 @@ public final class SimplePluginManager implements PluginManager {
      private final Map<String, Map<Permissible, Boolean>> permSubs = new HashMap<String, Map<Permissible, Boolean>>();
      private final Map<Boolean, Map<Permissible, Boolean>> defSubs = new HashMap<Boolean, Map<Permissible, Boolean>>();
      private boolean useTimings = false;
@@ -1178,7 +1253,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..19f40e389afce2ff8c8dc6820f353488
  
      public SimplePluginManager(@NotNull Server instance, @NotNull SimpleCommandMap commandMap) {
          server = instance;
-@@ -81,6 +83,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -81,6 +84,7 @@ public final class SimplePluginManager implements PluginManager {
              try {
                  constructor = loader.getConstructor(Server.class);
                  instance = constructor.newInstance(server);
@@ -1186,21 +1261,94 @@ index ed07f5820281b139739f673fa4e25171de81b894..19f40e389afce2ff8c8dc6820f353488
              } catch (NoSuchMethodException ex) {
                  String className = loader.getName();
  
-@@ -410,7 +413,12 @@ public final class SimplePluginManager implements PluginManager {
+@@ -115,6 +119,7 @@ public final class SimplePluginManager implements PluginManager {
+     }
+     @NotNull
+     public Plugin[] loadPlugins(final @NotNull File directory, final @NotNull List<File> extraPluginJars) {
++        if (true) {this.pluginManager.loadPlugins(directory);}
+         // Paper end
+         Preconditions.checkArgument(directory != null, "Directory cannot be null");
+         Preconditions.checkArgument(directory.isDirectory(), "Directory must be a directory");
+@@ -393,6 +398,7 @@ public final class SimplePluginManager implements PluginManager {
+     @Override
+     @Nullable
+     public synchronized Plugin loadPlugin(@NotNull File file) throws InvalidPluginException, UnknownDependencyException {
++        if (true) {return this.pluginManager.loadPlugin(file);} // Paper
+         Preconditions.checkArgument(file != null, "File cannot be null");
+ 
+         file = checkUpdate(file); // Paper - update the reference in case checkUpdate renamed it
+@@ -410,7 +416,6 @@ public final class SimplePluginManager implements PluginManager {
                  result = loader.loadPlugin(file);
              }
          }
 -
-+    // Paper start
-+        return loadPlugin(result);
-+    }
-+    @org.jetbrains.annotations.ApiStatus.Internal
-+    public synchronized Plugin loadPlugin(@Nullable Plugin result) throws UnknownDependencyException {
-+    // Paper end
          if (result != null) {
              plugins.add(result);
              lookupNames.put(result.getDescription().getName().toLowerCase(java.util.Locale.ENGLISH), result); // Paper
-@@ -923,13 +931,17 @@ public final class SimplePluginManager implements PluginManager {
+@@ -484,12 +489,14 @@ public final class SimplePluginManager implements PluginManager {
+     @Override
+     @Nullable
+     public synchronized Plugin getPlugin(@NotNull String name) {
++        if (true) {return this.pluginManager.getPlugin(name);} // Paper
+         return lookupNames.get(name.replace(' ', '_').toLowerCase(java.util.Locale.ENGLISH)); // Paper
+     }
+ 
+     @Override
+     @NotNull
+     public synchronized Plugin[] getPlugins() {
++        if (true) {return this.pluginManager.getPlugins();} // Paper
+         return plugins.toArray(new Plugin[plugins.size()]);
+     }
+ 
+@@ -503,6 +510,7 @@ public final class SimplePluginManager implements PluginManager {
+      */
+     @Override
+     public boolean isPluginEnabled(@NotNull String name) {
++        if (true) {return this.pluginManager.isPluginEnabled(name);} // Paper
+         Plugin plugin = getPlugin(name);
+ 
+         return isPluginEnabled(plugin);
+@@ -516,6 +524,7 @@ public final class SimplePluginManager implements PluginManager {
+      */
+     @Override
+     public synchronized boolean isPluginEnabled(@Nullable Plugin plugin) { // Paper - synchronize
++        if (true) {return this.pluginManager.isPluginEnabled(plugin);} // Paper
+         if ((plugin != null) && (plugins.contains(plugin))) {
+             return plugin.isEnabled();
+         } else {
+@@ -525,6 +534,7 @@ public final class SimplePluginManager implements PluginManager {
+ 
+     @Override
+     public synchronized void enablePlugin(@NotNull final Plugin plugin) { // Paper - synchronize
++        if (true) {this.pluginManager.enablePlugin(plugin); return;} // Paper
+         if (!plugin.isEnabled()) {
+             List<Command> pluginCommands = PluginCommandYamlParser.parse(plugin);
+ 
+@@ -545,6 +555,7 @@ public final class SimplePluginManager implements PluginManager {
+ 
+     @Override
+     public void disablePlugins() {
++        if (true) {this.pluginManager.disablePlugins(); return;} // Paper
+         Plugin[] plugins = getPlugins();
+         for (int i = plugins.length - 1; i >= 0; i--) {
+             disablePlugin(plugins[i]);
+@@ -568,6 +579,7 @@ public final class SimplePluginManager implements PluginManager {
+ 
+     @Override
+     public synchronized void disablePlugin(@NotNull final Plugin plugin) { // Paper - synchronize
++        if (true) {this.pluginManager.disablePlugin(plugin); return;} // Paper
+         if (plugin.isEnabled()) {
+             try {
+                 plugin.getPluginLoader().disablePlugin(plugin);
+@@ -624,6 +636,7 @@ public final class SimplePluginManager implements PluginManager {
+ 
+     @Override
+     public void clearPlugins() {
++        this.pluginManager.clearPlugins(); // Paper
+         synchronized (this) {
+             disablePlugins();
+             plugins.clear();
+@@ -923,13 +936,17 @@ public final class SimplePluginManager implements PluginManager {
          return new HashSet<Permission>(permissions.values());
      }
  
@@ -1223,7 +1371,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..19f40e389afce2ff8c8dc6820f353488
              }
              for (String provided : depend.getProvides()) {
 diff --git a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java b/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
-index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..1d14ce402a05749e45c62c9ed5faffb0b14cf143 100644
+index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..037e69d6287003714b84d66428d947f707dfb059 100644
 --- a/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
 +++ b/src/main/java/org/bukkit/plugin/java/JavaPlugin.java
 @@ -38,19 +38,21 @@ public abstract class JavaPlugin extends PluginBase {
@@ -1265,7 +1413,17 @@ index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..1d14ce402a05749e45c62c9ed5faffb0
      @NotNull
      @Override
      public FileConfiguration getConfig() {
-@@ -268,8 +275,12 @@ public abstract class JavaPlugin extends PluginBase {
+@@ -256,7 +263,8 @@ public abstract class JavaPlugin extends PluginBase {
+      *
+      * @param enabled true if enabled, otherwise false
+      */
+-    protected final void setEnabled(final boolean enabled) {
++    @org.jetbrains.annotations.ApiStatus.Internal // Paper
++    public final void setEnabled(final boolean enabled) { // Paper
+         if (isEnabled != enabled) {
+             isEnabled = enabled;
+ 
+@@ -268,8 +276,12 @@ public abstract class JavaPlugin extends PluginBase {
          }
      }
  
@@ -1280,7 +1438,7 @@ index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..1d14ce402a05749e45c62c9ed5faffb0
          this.loader = loader;
          this.server = server;
          this.file = file;
-@@ -281,6 +292,7 @@ public abstract class JavaPlugin extends PluginBase {
+@@ -281,6 +293,7 @@ public abstract class JavaPlugin extends PluginBase {
          if (this.logger == null) {
              this.logger = com.destroystokyo.paper.utils.PaperPluginLogger.getLogger(this.description);
          }
