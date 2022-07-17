@@ -17,20 +17,19 @@ index 37d28625b9528bbe0cd6d9623e702bbbc2b07883..ab9a00b60eed9da7e61feda90a69563a
  }
 diff --git a/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java b/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..718621279d67416cb4b5f793ae00154cfe93b094
+index 0000000000000000000000000000000000000000..ff90f2e11f9576693fcf93af47ebca83aeefb0dc
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/command/PaperPluginsCommand.java
-@@ -0,0 +1,219 @@
+@@ -0,0 +1,218 @@
 +package io.papermc.paper.command;
 +
 +import com.google.common.collect.Lists;
 +import io.papermc.paper.plugin.provider.PluginProvider;
 +import io.papermc.paper.plugin.provider.ProviderStatus;
 +import io.papermc.paper.plugin.provider.ProviderStatusHolder;
-+import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
 +import io.papermc.paper.plugin.provider.service.entrypoint.Entrypoint;
 +import io.papermc.paper.plugin.provider.service.entrypoint.ServerEntryPointHandler;
-+import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.ServerPluginProviderStorage;
 +import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
 +import io.papermc.paper.plugin.provider.type.paper.PaperPluginProvider;
 +import io.papermc.paper.plugin.provider.type.spigot.SpigotPluginProvider;
@@ -253,20 +252,444 @@ index dbd08c355cf116c8d1d61a81501dadce3749abcb..a56009ef0f73c929b4300fa4213c8492
  import net.kyori.adventure.text.Component;
  import net.kyori.adventure.text.format.NamedTextColor;
  import net.minecraft.network.protocol.Packet;
-diff --git a/src/main/java/io/papermc/paper/plugin/PaperPluginManagerImpl.java b/src/main/java/io/papermc/paper/plugin/PaperPluginManagerImpl.java
+diff --git a/src/main/java/io/papermc/paper/plugin/CapturingPluginEntrypoint.java b/src/main/java/io/papermc/paper/plugin/CapturingPluginEntrypoint.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..076973f2b68a1766065d7cac7b46d39bf2af8699
+index 0000000000000000000000000000000000000000..cca4a12bcaee617922a6b375be34d58902c49836
 --- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/PaperPluginManagerImpl.java
-@@ -0,0 +1,227 @@
++++ b/src/main/java/io/papermc/paper/plugin/CapturingPluginEntrypoint.java
+@@ -0,0 +1,48 @@
 +package io.papermc.paper.plugin;
 +
++import com.destroystokyo.paper.util.SneakyThrow;
++import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.service.entrypoint.Entrypoint;
++import io.papermc.paper.plugin.provider.service.entrypoint.EntrypointHandler;
++import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
++import org.bukkit.plugin.InvalidPluginException;
++import org.bukkit.plugin.java.JavaPlugin;
++
++import java.util.List;
++
++/**
++ * Used for loading plugins during runtime, only supporting providers that are plugins.
++ */
++public class CapturingPluginEntrypoint implements EntrypointHandler {
++
++    private final PluginManagerProviderStorage pluginProviderStorage = new PluginManagerProviderStorage();
++
++    private List<JavaPlugin> loaded;
++
++
++    @Override
++    public void enter(Entrypoint<?> entrypoint) {
++        if (entrypoint != Entrypoint.PLUGIN) {
++            throw new IllegalArgumentException("Only plugin entrypoint supported");
++        }
++        this.pluginProviderStorage.enter();
++        this.loaded = this.pluginProviderStorage.getLoaded();
++    }
++
++    public List<JavaPlugin> getLoaded() {
++        return this.loaded;
++    }
++
++    @Override
++    public <T extends PluginProvider<?>> void register(Entrypoint<T> entrypoint, T provider) {
++        if (entrypoint != Entrypoint.PLUGIN) {
++            SneakyThrow.sneaky(new InvalidPluginException("Plugin cannot register entrypoints other than PLUGIN during runtime. Tried registering %s!".formatted(entrypoint)));
++            // We have to throw an invalid plugin exception for legacy reasons
++        }
++        this.pluginProviderStorage.register((JavaPluginProvider) provider);
++    }
++
++    public Iterable<JavaPluginProvider> getProviders() {
++        return this.pluginProviderStorage.getRegisteredProviders();
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/PaperEventManager.java b/src/main/java/io/papermc/paper/plugin/PaperEventManager.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..209bd905839dda0c3804a60c4f36f367c77ccf96
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/PaperEventManager.java
+@@ -0,0 +1,181 @@
++package io.papermc.paper.plugin;
++
++import co.aikar.timings.TimedEventExecutor;
++import com.destroystokyo.paper.event.server.ServerExceptionEvent;
++import com.destroystokyo.paper.exception.ServerEventException;
++import com.google.common.collect.Sets;
++import org.bukkit.Server;
++import org.bukkit.Warning;
++import org.bukkit.event.*;
++import org.bukkit.plugin.*;
++import org.jetbrains.annotations.NotNull;
++
++import java.lang.reflect.Method;
++import java.util.*;
++import java.util.logging.Level;
++import java.util.stream.Collectors;
++import java.util.stream.Stream;
++
++class PaperEventManager {
++
++    private final Server server;
++
++    public PaperEventManager(Server server) {
++        this.server = server;
++    }
++
++    // SimplePluginManager
++    public void callEvent(@NotNull Event event) {
++        if (event.isAsynchronous() && this.server.isPrimaryThread()) {
++            throw new IllegalStateException(event.getEventName() + " may only be triggered asynchronously.");
++        } else if (!event.isAsynchronous() && !this.server.isPrimaryThread() && !this.server.isStopping()) {
++            throw new IllegalStateException(event.getEventName() + " may only be triggered synchronously.");
++        }
++
++        HandlerList handlers = event.getHandlers();
++        RegisteredListener[] listeners = handlers.getRegisteredListeners();
++
++        for (RegisteredListener registration : listeners) {
++            if (!registration.getPlugin().isEnabled()) {
++                continue;
++            }
++
++            try {
++                registration.callEvent(event);
++            } catch (AuthorNagException ex) {
++                Plugin plugin = registration.getPlugin();
++
++                if (plugin.isNaggable()) {
++                    plugin.setNaggable(false);
++
++                    this.server.getLogger().log(Level.SEVERE, String.format(
++                        "Nag author(s): '%s' of '%s' about the following: %s",
++                        plugin.getConfiguration().getAuthors(),
++                        plugin.getConfiguration().getDisplayName(),
++                        ex.getMessage()
++                    ));
++                }
++            } catch (Throwable ex) {
++                String msg = "Could not pass event " + event.getEventName() + " to " + registration.getPlugin().getConfiguration().getDisplayName();
++                this.server.getLogger().log(Level.SEVERE, msg, ex);
++                if (!(event instanceof ServerExceptionEvent)) { // We don't want to cause an endless event loop
++                    this.callEvent(new ServerExceptionEvent(new ServerEventException(msg, ex, registration.getPlugin(), registration.getListener(), event)));
++                }
++            }
++        }
++    }
++
++    public void registerEvents(@NotNull Listener listener, @NotNull Plugin plugin) {
++        if (!plugin.isEnabled()) {
++            throw new IllegalPluginAccessException("Plugin attempted to register " + listener + " while not enabled");
++        }
++
++        for (Map.Entry<Class<? extends Event>, Set<RegisteredListener>> entry : this.createRegisteredListeners(listener, plugin).entrySet()) {
++            this.getEventListeners(this.getRegistrationClass(entry.getKey())).registerAll(entry.getValue());
++        }
++
++    }
++
++    public void registerEvent(@NotNull Class<? extends Event> event, @NotNull Listener listener, @NotNull EventPriority priority, @NotNull EventExecutor executor, @NotNull Plugin plugin) {
++        this.registerEvent(event, listener, priority, executor, plugin, false);
++    }
++
++    public void registerEvent(@NotNull Class<? extends Event> event, @NotNull Listener listener, @NotNull EventPriority priority, @NotNull EventExecutor executor, @NotNull Plugin plugin, boolean ignoreCancelled) {
++        if (!plugin.isEnabled()) {
++            throw new IllegalPluginAccessException("Plugin attempted to register " + event + " while not enabled");
++        }
++
++        executor = new TimedEventExecutor(executor, plugin, null, event);
++        this.getEventListeners(event).register(new RegisteredListener(listener, executor, priority, plugin, ignoreCancelled));
++    }
++
++    @NotNull
++    private HandlerList getEventListeners(@NotNull Class<? extends Event> type) {
++        try {
++            Method method = this.getRegistrationClass(type).getDeclaredMethod("getHandlerList");
++            method.setAccessible(true);
++            return (HandlerList) method.invoke(null);
++        } catch (Exception e) {
++            throw new IllegalPluginAccessException(e.toString());
++        }
++    }
++
++    @NotNull
++    private Class<? extends Event> getRegistrationClass(@NotNull Class<? extends Event> clazz) {
++        try {
++            clazz.getDeclaredMethod("getHandlerList");
++            return clazz;
++        } catch (NoSuchMethodException e) {
++            if (clazz.getSuperclass() != null
++                && !clazz.getSuperclass().equals(Event.class)
++                && Event.class.isAssignableFrom(clazz.getSuperclass())) {
++                return this.getRegistrationClass(clazz.getSuperclass().asSubclass(Event.class));
++            } else {
++                throw new IllegalPluginAccessException("Unable to find handler list for event " + clazz.getName() + ". Static getHandlerList method required!");
++            }
++        }
++    }
++
++    // JavaPluginLoader
++    @NotNull
++    public Map<Class<? extends Event>, Set<RegisteredListener>> createRegisteredListeners(@NotNull Listener listener, @NotNull final Plugin plugin) {
++        Map<Class<? extends Event>, Set<RegisteredListener>> ret = new HashMap<>();
++
++        Set<Method> methods;
++        try {
++            Class<?> listenerClazz = listener.getClass();
++            methods = Sets.union(
++                Set.of(listenerClazz.getMethods()),
++                Set.of(listenerClazz.getDeclaredMethods())
++                );
++        } catch (NoClassDefFoundError e) {
++            plugin.getLogger().severe("Failed to register events for " + listener.getClass() + " because " + e.getMessage() + " does not exist.");
++            return ret;
++        }
++
++        for (final Method method : methods) {
++            final EventHandler eh = method.getAnnotation(EventHandler.class);
++            if (eh == null) continue;
++            // Do not register bridge or synthetic methods to avoid event duplication
++            // Fixes SPIGOT-893
++            if (method.isBridge() || method.isSynthetic()) {
++                continue;
++            }
++            final Class<?> checkClass;
++            if (method.getParameterTypes().length != 1 || !Event.class.isAssignableFrom(checkClass = method.getParameterTypes()[0])) {
++                plugin.getLogger().severe(plugin.getConfiguration().getDisplayName() + " attempted to register an invalid EventHandler method signature \"" + method.toGenericString() + "\" in " + listener.getClass());
++                continue;
++            }
++            final Class<? extends Event> eventClass = checkClass.asSubclass(Event.class);
++            method.setAccessible(true);
++            Set<RegisteredListener> eventSet = ret.computeIfAbsent(eventClass, k -> new HashSet<>());
++
++            for (Class<?> clazz = eventClass; Event.class.isAssignableFrom(clazz); clazz = clazz.getSuperclass()) {
++                // This loop checks for extending deprecated events
++                if (clazz.getAnnotation(Deprecated.class) != null) {
++                    Warning warning = clazz.getAnnotation(Warning.class);
++                    Warning.WarningState warningState = this.server.getWarningState();
++                    if (!warningState.printFor(warning)) {
++                        break;
++                    }
++                    plugin.getLogger().log(
++                        Level.WARNING,
++                        String.format(
++                            "\"%s\" has registered a listener for %s on method \"%s\", but the event is Deprecated. \"%s\"; please notify the authors %s.",
++                            plugin.getConfiguration().getDescription(),
++                            clazz.getName(),
++                            method.toGenericString(),
++                            (warning != null && warning.reason().length() != 0) ? warning.reason() : "Server performance will be affected",
++                            Arrays.toString(plugin.getConfiguration().getAuthors().toArray())),
++                        warningState == Warning.WarningState.ON ? new AuthorNagException(null) : null);
++                    break;
++                }
++            }
++
++            EventExecutor executor = new TimedEventExecutor(EventExecutor.create(method, eventClass), plugin, method, eventClass);
++            eventSet.add(new RegisteredListener(listener, executor, eh.priority(), plugin, eh.ignoreCancelled()));
++        }
++        return ret;
++    }
++
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/PaperPermissionManager.java b/src/main/java/io/papermc/paper/plugin/PaperPermissionManager.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..73e88e273aa78475b9ebb9537f93332a0cc735e9
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/PaperPermissionManager.java
+@@ -0,0 +1,174 @@
++package io.papermc.paper.plugin;
++
++import com.google.common.collect.ImmutableSet;
++import org.bukkit.permissions.Permissible;
++import org.bukkit.permissions.Permission;
++import org.bukkit.permissions.PermissionDefault;
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
++
++import java.util.*;
++
++class PaperPermissionManager {
++
++    private final Map<String, Permission> permissions = new HashMap<>();
++    private final Map<Boolean, Set<Permission>> defaultPerms = new LinkedHashMap<>();
++    private final Map<String, Map<Permissible, Boolean>> permSubs = new HashMap<>();
++    private final Map<Boolean, Map<Permissible, Boolean>> defSubs = new HashMap<>();
++
++    public PaperPermissionManager() {
++        defaultPerms.put(true, new LinkedHashSet<>());
++        defaultPerms.put(false, new LinkedHashSet<>());
++    }
++
++    @Nullable
++    public Permission getPermission(@NotNull String name) {
++        return this.permissions.get(name.toLowerCase(java.util.Locale.ENGLISH));
++    }
++
++
++    public void addPermission(@NotNull Permission perm) {
++        this.addPermission(perm, true);
++    }
++
++    // Allow suppressing permission default calculations
++    public void addPermission(@NotNull Permission perm, boolean dirty) {
++        String name = perm.getName().toLowerCase(java.util.Locale.ENGLISH);
++
++        if (this.permissions.containsKey(name)) {
++            throw new IllegalArgumentException("The permission " + name + " is already defined!");
++        }
++
++        this.permissions.put(name, perm);
++        this.calculatePermissionDefault(perm, dirty);
++    }
++
++
++    @NotNull
++    public Set<Permission> getDefaultPermissions(boolean op) {
++        return ImmutableSet.copyOf(this.defaultPerms.get(op));
++    }
++
++
++    public void removePermission(@NotNull Permission perm) {
++        this.removePermission(perm.getName());
++    }
++
++
++    public void removePermission(@NotNull String name) {
++        this.permissions.remove(name.toLowerCase(java.util.Locale.ENGLISH));
++    }
++
++
++    void recalculatePermissionDefaults(@NotNull Permission perm) {
++        if (this.permissions.containsKey(perm.getName().toLowerCase(Locale.ENGLISH))) {
++            this.defaultPerms.get(true).remove(perm);
++            this.defaultPerms.get(false).remove(perm);
++
++            this.calculatePermissionDefault(perm, true);
++        }
++    }
++
++    private void calculatePermissionDefault(@NotNull Permission perm, boolean dirty) {
++        if ((perm.getDefault() == PermissionDefault.OP) || (perm.getDefault() == PermissionDefault.TRUE)) {
++            this.defaultPerms.get(true).add(perm);
++            if (dirty) {
++                this.dirtyPermissibles(true);
++            }
++        }
++        if ((perm.getDefault() == PermissionDefault.NOT_OP) || (perm.getDefault() == PermissionDefault.TRUE)) {
++            this.defaultPerms.get(false).add(perm);
++            if (dirty) {
++                this.dirtyPermissibles(false);
++            }
++        }
++    }
++
++    public void dirtyPermissibles(boolean op) {
++        Set<Permissible> permissibles = this.getDefaultPermSubscriptions(op);
++
++        for (Permissible p : permissibles) {
++            p.recalculatePermissions();
++        }
++    }
++
++
++    public void subscribeToPermission(@NotNull String permission, @NotNull Permissible permissible) {
++        String name = permission.toLowerCase(java.util.Locale.ENGLISH);
++        Map<Permissible, Boolean> map = this.permSubs.computeIfAbsent(name, k -> new WeakHashMap<>());
++
++        map.put(permissible, true);
++    }
++
++
++    public void unsubscribeFromPermission(@NotNull String permission, @NotNull Permissible permissible) {
++        String name = permission.toLowerCase(java.util.Locale.ENGLISH);
++        Map<Permissible, Boolean> map = this.permSubs.get(name);
++
++        if (map != null) {
++            map.remove(permissible);
++
++            if (map.isEmpty()) {
++                this.permSubs.remove(name);
++            }
++        }
++    }
++
++
++    @NotNull
++    public Set<Permissible> getPermissionSubscriptions(@NotNull String permission) {
++        String name = permission.toLowerCase(java.util.Locale.ENGLISH);
++        Map<Permissible, Boolean> map = this.permSubs.get(name);
++
++        if (map == null) {
++            return ImmutableSet.of();
++        } else {
++            return ImmutableSet.copyOf(map.keySet());
++        }
++    }
++
++
++    public void subscribeToDefaultPerms(boolean op, @NotNull Permissible permissible) {
++        Map<Permissible, Boolean> map = this.defSubs.computeIfAbsent(op, k -> new WeakHashMap<>());
++
++        map.put(permissible, true);
++    }
++
++
++    public void unsubscribeFromDefaultPerms(boolean op, @NotNull Permissible permissible) {
++        Map<Permissible, Boolean> map = this.defSubs.get(op);
++
++        if (map != null) {
++            map.remove(permissible);
++
++            if (map.isEmpty()) {
++                this.defSubs.remove(op);
++            }
++        }
++    }
++
++
++    @NotNull
++    public Set<Permissible> getDefaultPermSubscriptions(boolean op) {
++        Map<Permissible, Boolean> map = this.defSubs.get(op);
++
++        if (map == null) {
++            return ImmutableSet.of();
++        } else {
++            return ImmutableSet.copyOf(map.keySet());
++        }
++    }
++
++
++    @NotNull
++    public Set<Permission> getPermissions() {
++        return new HashSet<>(this.permissions.values());
++    }
++
++    public void clearPermissions() {
++        this.permissions.clear();
++        this.defaultPerms.get(true).clear();
++        this.defaultPerms.get(false).clear();
++    }
++
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/PaperPluginInstanceManager.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..20be52115eb321891da5bde5d61be7baeae7bdd3
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/PaperPluginInstanceManager.java
+@@ -0,0 +1,302 @@
++package io.papermc.paper.plugin;
++
++import com.google.common.base.Preconditions;
++import io.papermc.paper.plugin.provider.service.classloader.ConfiguredPluginClassLoader;
 +import io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoaderStorage;
 +import io.papermc.paper.plugin.provider.service.classloader.PluginClassloader;
 +import io.papermc.paper.plugin.provider.service.entrypoint.Entrypoint;
-+import io.papermc.paper.plugin.provider.service.entrypoint.RuntimePluginEntrypointHandler;
++import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.impl.modern.PluginGraphCycleException;
 +import io.papermc.paper.plugin.provider.source.impl.DirectoryProviderSource;
 +import io.papermc.paper.plugin.provider.source.impl.FileProviderSource;
++import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
 +import org.bukkit.Bukkit;
 +import org.bukkit.Server;
 +import org.bukkit.World;
@@ -275,22 +698,25 @@ index 0000000000000000000000000000000000000000..076973f2b68a1766065d7cac7b46d39b
 +import org.bukkit.command.PluginCommandYamlParser;
 +import org.bukkit.event.HandlerList;
 +import org.bukkit.event.server.PluginDisableEvent;
++import org.bukkit.event.server.PluginEnableEvent;
 +import org.bukkit.plugin.*;
 +import org.bukkit.plugin.java.JavaPlugin;
 +import org.jetbrains.annotations.NotNull;
 +import org.jetbrains.annotations.Nullable;
 +import org.spongepowered.configurate.serialize.SerializationException;
 +
-+import java.io.File;
 +import java.io.IOException;
 +import java.net.URLClassLoader;
++import java.nio.file.Files;
++import java.nio.file.Path;
 +import java.util.ArrayList;
 +import java.util.HashMap;
 +import java.util.List;
 +import java.util.Map;
 +import java.util.logging.Level;
++import java.util.logging.Logger;
 +
-+public class PaperPluginManagerImpl implements PaperPluginManager {
++class PaperPluginInstanceManager {
 +
 +    private static final FileProviderSource FILE_PROVIDER_SOURCE = new FileProviderSource(false);
 +    private static final DirectoryProviderSource DIRECTORY_PROVIDER_SOURCE = new DirectoryProviderSource();
@@ -300,34 +726,30 @@ index 0000000000000000000000000000000000000000..076973f2b68a1766065d7cac7b46d39b
 +    private final List<Plugin> plugins = new ArrayList<>();
 +    private final Map<String, Plugin> lookupNames = new HashMap<>();
 +
++    private final PluginManager pluginManager;
 +    private final CommandMap commandMap;
-+    private final SimplePluginManager pluginManager;
 +    private final Server server;
 +
-+    public PaperPluginManagerImpl(CommandMap commandMap, SimplePluginManager pluginManager, Server server) {
++    public PaperPluginInstanceManager(PluginManager pluginManager, CommandMap commandMap, Server server) {
 +        this.commandMap = commandMap;
-+        this.pluginManager = pluginManager;
 +        this.server = server;
++        this.pluginManager = pluginManager;
 +    }
 +
-+    @Override
 +    public @Nullable Plugin getPlugin(@NotNull String name) {
 +        return this.lookupNames.get(name.replace(' ', '_').toLowerCase(java.util.Locale.ENGLISH)); // Paper
 +    }
 +
-+    @Override
 +    public @NotNull Plugin[] getPlugins() {
 +        return this.plugins.toArray(new Plugin[0]);
 +    }
 +
-+    @Override
 +    public boolean isPluginEnabled(@NotNull String name) {
 +        Plugin plugin = this.getPlugin(name);
 +
 +        return this.isPluginEnabled(plugin);
 +    }
 +
-+    @Override
 +    public synchronized boolean isPluginEnabled(@Nullable Plugin plugin) {
 +        if ((plugin != null) && (this.plugins.contains(plugin))) {
 +            return plugin.isEnabled();
@@ -336,7 +758,6 @@ index 0000000000000000000000000000000000000000..076973f2b68a1766065d7cac7b46d39b
 +        }
 +    }
 +
-+    @Override
 +    public void loadPlugin(Plugin provided) {
 +        this.plugins.add(provided);
 +        this.lookupNames.put(provided.getConfiguration().getIdentifier().toLowerCase(java.util.Locale.ENGLISH), provided);
@@ -345,34 +766,84 @@ index 0000000000000000000000000000000000000000..076973f2b68a1766065d7cac7b46d39b
 +        }
 +    }
 +
-+    // InvalidDescriptionException is never used on purpose, legacy reasons
-+    @Override
-+    public @Nullable Plugin loadPlugin(@NotNull File file) throws InvalidPluginException, UnknownDependencyException {
-+        RuntimePluginEntrypointHandler runtimePluginEntrypointHandler = new RuntimePluginEntrypointHandler(this);
-+        try {
-+            FILE_PROVIDER_SOURCE.registerProviders(runtimePluginEntrypointHandler, file.toPath());
++    // InvalidDescriptionException is never used, because the old JavaPluginLoader would wrap the exception.
++    public @Nullable Plugin loadPlugin(@NotNull Path path) throws InvalidPluginException, UnknownDependencyException {
++        CapturingPluginEntrypoint runtimePluginEntrypointHandler = new CapturingPluginEntrypoint();
 +
-+            runtimePluginEntrypointHandler.enter(Entrypoint.PLUGIN);
-+        } catch (SerializationException |
-+                 InvalidDescriptionException ex) { // The spigot implementation wraps it in an invalid plugin exception
++        try {
++            FILE_PROVIDER_SOURCE.registerProviders(runtimePluginEntrypointHandler, path);
++        } catch (IllegalArgumentException exception) {
++            return null; // Return null when the plugin file is not valid / plugin type is unknown
++        } catch (PluginGraphCycleException exception) {
++            throw new InvalidPluginException("Cannot import plugin that causes cyclic dependencies!");
++        } catch (SerializationException | InvalidDescriptionException ex) { // The spigot implementation wraps it in an invalid plugin exception
 +            throw new InvalidPluginException(ex);
-+        } catch (Throwable e) {
++        } catch (Exception e) {
 +            throw new InvalidPluginException(e);
 +        }
 +
-+        JavaPlugin provided = runtimePluginEntrypointHandler.getProvided();
-+        this.loadPlugin(provided);
-+        return provided;
++        try {
++            boolean isFirst = true;
++            for (JavaPluginProvider provider : runtimePluginEntrypointHandler.getProviders()) {
++                if (isFirst) {
++                    isFirst = false;
++                    // Manually validate dependencies, LEGACY BEHAVIOR.
++                    // Normally it is logged, but manually adding one plugin will cause it to actually throw exceptions.
++                    List<String> missingDependencies = new ArrayList<>();
++                    for (String dependency : provider.getConfiguration().getHardDependencies()) {
++                        if (!this.pluginManager.isPluginEnabled(dependency)) {
++                            missingDependencies.add(dependency);
++                        }
++                    }
++                    if (!missingDependencies.isEmpty()) {
++                        throw new UnknownDependencyException(missingDependencies, provider.getFileName().toString());
++                    }
++                } else {
++                    throw new InvalidPluginException("Plugin loaded multiple plugin providers... this shouldn't happen.");
++                }
++            }
++
++            runtimePluginEntrypointHandler.enter(Entrypoint.PLUGIN);
++        }  catch (Throwable e) {
++            throw new InvalidPluginException(e);
++        }
++        List<JavaPlugin> pluginList = runtimePluginEntrypointHandler.getLoaded();
++        if (pluginList.isEmpty()) {
++            throw new InvalidPluginException("Plugin didn't load any plugin providers?");
++        }
++
++        return runtimePluginEntrypointHandler.getLoaded().get(0);
 +    }
 +
-+    @Override
-+    public @NotNull Plugin[] loadPlugins(@NotNull File directory) {
-+        throw new UnsupportedOperationException(); // TODO
++    // The behavior of this is that all errors are logged instead of being thrown
++    public @NotNull Plugin[] loadPlugins(@NotNull Path directory) {
++        Preconditions.checkArgument(Files.isDirectory(directory), "Directory must be a directory"); // Avoid creating a directory if it doesn't exist
++
++        CapturingPluginEntrypoint runtimePluginEntrypointHandler = new CapturingPluginEntrypoint();
++        try {
++            DIRECTORY_PROVIDER_SOURCE.registerProviders(runtimePluginEntrypointHandler, directory);
++            runtimePluginEntrypointHandler.enter(Entrypoint.PLUGIN);
++        } catch (PluginGraphCycleException exception) {
++            Logger logger = this.server.getLogger();
++            logger.log(Level.SEVERE, "Circular dependencies detected while loading plugins through PluginManager.");
++            List<String> logMessages = new ArrayList<>();
++            for (List<String> list : exception.getCycles()) {
++                // CoolPlugin depends on Dependency depends on CoolPlugin...
++                logMessages.add(String.join(" depends on ", list) + " depends on " + list.get(0) + "...");
++            }
++            for (String message : logMessages) {
++                logger.log(Level.SEVERE, message);
++            }
++        } catch (Exception e) {
++            // This should never happen, any errors that occur in this provider should instead be logged.
++            this.server.getLogger().log(Level.SEVERE, "Unknown error occurred while loading plugins through PluginManager.", e);
++        }
++
++        return runtimePluginEntrypointHandler.getLoaded().toArray(new JavaPlugin[0]);
 +    }
 +
 +    // I do not know why....
 +    // Not even going to touch this!
-+    @Override
 +    public void disablePlugins() {
 +        Plugin[] plugins = this.getPlugins();
 +        for (int i = plugins.length - 1; i >= 0; i--) {
@@ -380,7 +851,6 @@ index 0000000000000000000000000000000000000000..076973f2b68a1766065d7cac7b46d39b
 +        }
 +    }
 +
-+    @Override
 +    public void clearPlugins() {
 +        synchronized (this) {
 +            this.disablePlugins();
@@ -389,7 +859,6 @@ index 0000000000000000000000000000000000000000..076973f2b68a1766065d7cac7b46d39b
 +        }
 +    }
 +
-+    @Override
 +    public synchronized void enablePlugin(@NotNull Plugin plugin) {
 +        if (!plugin.isEnabled()) {
 +            List<Command> pluginCommands = PluginCommandYamlParser.parse(plugin);
@@ -399,7 +868,34 @@ index 0000000000000000000000000000000000000000..076973f2b68a1766065d7cac7b46d39b
 +            }
 +
 +            try {
-+                plugin.getPluginLoader().enablePlugin(plugin);
++                String enableMsg = "Enabling " + plugin.getConfiguration().getDisplayName();
++                if (org.bukkit.UnsafeValues.isLegacyPlugin(plugin)) {
++                    enableMsg += "*";
++                }
++                plugin.getLogger().info(enableMsg);
++
++                JavaPlugin jPlugin = (JavaPlugin) plugin;
++
++                if (jPlugin.getClass().getClassLoader() instanceof ConfiguredPluginClassLoader classLoader) { // Paper
++                    if (!PaperPluginClassLoaderStorage.INSTANCE.contains(classLoader)) {
++                        PaperPluginClassLoaderStorage.INSTANCE.add(classLoader);
++                        this.server.getLogger().log(Level.WARNING, "Enabled plugin with unregistered ConfiguredPluginClassLoader " + plugin.getConfiguration().getDisplayName());
++                    }
++                } // Paper
++
++                try {
++                    jPlugin.setEnabled(true);
++                } catch (Throwable ex) {
++                    this.server.getLogger().log(Level.SEVERE, "Error occurred while enabling " + plugin.getConfiguration().getDisplayName() + " (Is it up to date?)", ex);
++                    // Paper start - Disable plugins that fail to load
++                    this.server.getPluginManager().disablePlugin(jPlugin);
++                    return;
++                    // Paper end
++                }
++
++                // Perhaps abort here, rather than continue going, but as it stands,
++                // an abort is not possible the way it's currently written
++                this.server.getPluginManager().callEvent(new PluginEnableEvent(plugin));
 +            } catch (Throwable ex) {
 +                this.handlePluginException("Error occurred (in the plugin loader) while enabling "
 +                    + plugin.getConfiguration().getDisplayName() + " (Is it up to date?)", ex, plugin);
@@ -409,7 +905,6 @@ index 0000000000000000000000000000000000000000..076973f2b68a1766065d7cac7b46d39b
 +        }
 +    }
 +
-+    @Override
 +    public synchronized void disablePlugin(@NotNull Plugin plugin) {
 +        if (!(plugin instanceof JavaPlugin javaPlugin)) {
 +            throw new IllegalArgumentException("Only expects java plugins.");
@@ -486,16 +981,279 @@ index 0000000000000000000000000000000000000000..076973f2b68a1766065d7cac7b46d39b
 +        this.pluginManager.callEvent(new com.destroystokyo.paper.event.server.ServerExceptionEvent(new com.destroystokyo.paper.exception.ServerPluginEnableDisableException(msg, ex, plugin)));
 +    }
 +}
+diff --git a/src/main/java/io/papermc/paper/plugin/PaperPluginManagerImpl.java b/src/main/java/io/papermc/paper/plugin/PaperPluginManagerImpl.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..0d323c2062a2936a3908edab72bf32de2636a5da
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/PaperPluginManagerImpl.java
+@@ -0,0 +1,197 @@
++package io.papermc.paper.plugin;
++
++import org.bukkit.Server;
++import org.bukkit.command.CommandMap;
++import org.bukkit.event.Event;
++import org.bukkit.event.EventPriority;
++import org.bukkit.event.Listener;
++import org.bukkit.permissions.Permissible;
++import org.bukkit.permissions.Permission;
++import org.bukkit.plugin.*;
++import org.jetbrains.annotations.ApiStatus;
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
++
++import java.io.File;
++import java.util.Set;
++
++public class PaperPluginManagerImpl implements PluginManager {
++
++    private final PaperPermissionManager permissionManager = new PaperPermissionManager();
++    private final PaperPluginInstanceManager instanceManager;
++    private final PaperEventManager paperEventManager;
++
++    public PaperPluginManagerImpl(Server server, CommandMap commandMap) {
++        this.instanceManager = new PaperPluginInstanceManager(this, commandMap, server);
++        this.paperEventManager = new PaperEventManager(server);
++    }
++
++    @Override
++    public void registerInterface(@NotNull Class<? extends PluginLoader> loader) throws IllegalArgumentException {
++        throw new UnsupportedOperationException();
++    }
++
++    @Override
++    public @Nullable Plugin getPlugin(@NotNull String name) {
++        return this.instanceManager.getPlugin(name);
++    }
++
++    @Override
++    public @NotNull Plugin[] getPlugins() {
++        return this.instanceManager.getPlugins();
++    }
++
++    @Override
++    public boolean isPluginEnabled(@NotNull String name) {
++        return this.instanceManager.isPluginEnabled(name);
++    }
++
++    @Override
++    public boolean isPluginEnabled(@Nullable Plugin plugin) {
++        return this.instanceManager.isPluginEnabled(plugin);
++    }
++
++    public void loadPlugin(Plugin plugin) {
++        this.instanceManager.loadPlugin(plugin);
++    }
++
++    @Override
++    public @Nullable Plugin loadPlugin(@NotNull File file) throws InvalidPluginException, InvalidDescriptionException, UnknownDependencyException {
++        return this.instanceManager.loadPlugin(file.toPath());
++    }
++
++    @Override
++    public @NotNull Plugin[] loadPlugins(@NotNull File directory) {
++        return this.instanceManager.loadPlugins(directory.toPath());
++    }
++
++    @Override
++    public void disablePlugins() {
++        this.instanceManager.disablePlugins();
++    }
++
++    @Override
++    public void clearPlugins() {
++        this.instanceManager.clearPlugins();
++    }
++
++    @Override
++    public void enablePlugin(@NotNull Plugin plugin) {
++        this.instanceManager.enablePlugin(plugin);
++    }
++
++    @Override
++    public void disablePlugin(@NotNull Plugin plugin) {
++        this.instanceManager.disablePlugin(plugin);
++    }
++
++    @Override
++    public void callEvent(@NotNull Event event) throws IllegalStateException {
++        this.paperEventManager.callEvent(event);
++    }
++
++    @Override
++    public void registerEvents(@NotNull Listener listener, @NotNull Plugin plugin) {
++        this.paperEventManager.registerEvents(listener, plugin);
++    }
++
++    @Override
++    public void registerEvent(@NotNull Class<? extends Event> event, @NotNull Listener listener, @NotNull EventPriority priority, @NotNull EventExecutor executor, @NotNull Plugin plugin) {
++        this.paperEventManager.registerEvent(event, listener, priority, executor, plugin);
++    }
++
++    @Override
++    public void registerEvent(@NotNull Class<? extends Event> event, @NotNull Listener listener, @NotNull EventPriority priority, @NotNull EventExecutor executor, @NotNull Plugin plugin, boolean ignoreCancelled) {
++        this.paperEventManager.registerEvent(event, listener, priority, executor, plugin, ignoreCancelled);
++    }
++
++    @Override
++    public @Nullable Permission getPermission(@NotNull String name) {
++        return this.permissionManager.getPermission(name);
++    }
++
++    @Override
++    public void addPermission(@NotNull Permission perm) {
++        this.permissionManager.addPermission(perm);
++    }
++
++    @Override
++    public void removePermission(@NotNull Permission perm) {
++        this.permissionManager.removePermission(perm);
++    }
++
++    @Override
++    public void removePermission(@NotNull String name) {
++        this.permissionManager.removePermission(name);
++    }
++
++    @Override
++    public @NotNull Set<Permission> getDefaultPermissions(boolean op) {
++        return this.permissionManager.getDefaultPermissions(op);
++    }
++
++    @Override
++    public void recalculatePermissionDefaults(@NotNull Permission perm) {
++        this.permissionManager.recalculatePermissionDefaults(perm);
++    }
++
++    @Override
++    public void subscribeToPermission(@NotNull String permission, @NotNull Permissible permissible) {
++        this.permissionManager.subscribeToPermission(permission, permissible);
++    }
++
++    @Override
++    public void unsubscribeFromPermission(@NotNull String permission, @NotNull Permissible permissible) {
++        this.permissionManager.unsubscribeFromPermission(permission, permissible);
++    }
++
++    @Override
++    public @NotNull Set<Permissible> getPermissionSubscriptions(@NotNull String permission) {
++        return this.permissionManager.getPermissionSubscriptions(permission);
++    }
++
++    @Override
++    public void subscribeToDefaultPerms(boolean op, @NotNull Permissible permissible) {
++        this.permissionManager.subscribeToDefaultPerms(op, permissible);
++    }
++
++    @Override
++    public void unsubscribeFromDefaultPerms(boolean op, @NotNull Permissible permissible) {
++        this.permissionManager.unsubscribeFromDefaultPerms(op, permissible);
++    }
++
++    @Override
++    public @NotNull Set<Permissible> getDefaultPermSubscriptions(boolean op) {
++        return this.permissionManager.getDefaultPermSubscriptions(op);
++    }
++
++    @Override
++    public @NotNull Set<Permission> getPermissions() {
++        return this.permissionManager.getPermissions();
++    }
++
++    @ApiStatus.Internal
++    public void addPermission(@NotNull Permission perm, boolean dirty) {
++        this.permissionManager.addPermission(perm, dirty);
++    }
++
++    public void clearPermissions() {
++        this.permissionManager.clearPermissions();
++    }
++
++    @ApiStatus.Internal
++    public void dirtyPermissibles() {
++        this.dirtyPermissibles(true);
++        this.dirtyPermissibles(false);
++    }
++
++    public void dirtyPermissibles(boolean op) {
++        this.permissionManager.dirtyPermissibles(op);
++    }
++
++    @Override
++    public boolean useTimings() {
++        return co.aikar.timings.Timings.isTimingsEnabled();
++    }
++
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/PluginManagerProviderStorage.java b/src/main/java/io/papermc/paper/plugin/PluginManagerProviderStorage.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..02f25f343fdb4c51fd4e0bbdf40dbee7e8bb21e4
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/PluginManagerProviderStorage.java
+@@ -0,0 +1,54 @@
++package io.papermc.paper.plugin;
++
++import io.papermc.paper.configuration.GlobalConfiguration;
++import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.service.entrypoint.Entrypoint;
++import io.papermc.paper.plugin.provider.service.entrypoint.ServerEntryPointHandler;
++import io.papermc.paper.plugin.provider.service.entrypoint.storage.SimpleProviderStorage;
++import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.ServerPluginProviderStorage;
++import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.PluginLoadingStrategy;
++import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.impl.legacy.LegacyPluginLoadingStrategy;
++import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.impl.modern.ModernPluginLoadingStrategy;
++import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
++import org.bukkit.plugin.java.JavaPlugin;
++
++import java.util.ArrayList;
++import java.util.List;
++
++class PluginManagerProviderStorage extends SimpleProviderStorage<JavaPluginProvider> {
++
++    private List<JavaPlugin> loaded;
++
++    @Override
++    public void enter() {
++        PluginLoadingStrategy strategy = switch (GlobalConfiguration.get().misc.pluginLoadingStrategy) {
++            case MODERN -> ModernPluginLoadingStrategy.INSTANCE;
++            case LEGACY -> LegacyPluginLoadingStrategy.INSTANCE;
++        };
++
++        List<PluginProvider<JavaPlugin>> providerList = new ArrayList<>(this.providers);
++
++        // Load paper plugin commands after they are loaded
++        // We have to use our own separate process
++        List<JavaPlugin> loaded = strategy.loadPlugins(providerList);
++        for (JavaPlugin plugin : loaded) {
++            ServerPluginProviderStorage.setupJavaplugin(plugin);
++        }
++
++        this.loaded = loaded;
++    }
++
++    @Override
++    public void register(JavaPluginProvider provider) {
++        super.register(provider);
++        /*
++        Register the provider into the server entrypoint, this allows it to show in /plugins correctly. Generally it might be better in the future to make a separate storage,
++        as putting it into the entrypoint handlers doesn't make much sense.
++         */
++        ServerEntryPointHandler.INSTANCE.register(Entrypoint.PLUGIN, provider);
++    }
++
++    public List<JavaPlugin> getLoaded() {
++        return this.loaded;
++    }
++}
 diff --git a/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrapContextImpl.java b/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrapContextImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..f0d0d45266ca4115db31fbf44200d2c43f47394a
+index 0000000000000000000000000000000000000000..fb8e7c890f3e814157130893a4145ad65af1e86b
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrapContextImpl.java
 @@ -0,0 +1,38 @@
 +package io.papermc.paper.plugin.bootstrap;
 +
 +import io.papermc.paper.plugin.provider.PluginProvider;
-+import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
 +import org.jetbrains.annotations.NotNull;
 +
 +import java.nio.file.Path;
@@ -532,16 +1290,15 @@ index 0000000000000000000000000000000000000000..f0d0d45266ca4115db31fbf44200d2c4
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/loader/PaperClasspathBuilder.java b/src/main/java/io/papermc/paper/plugin/loader/PaperClasspathBuilder.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..f47c3d3f519e702c70885673a54889e5f6dd63c0
+index 0000000000000000000000000000000000000000..a22fbf8e483a1a548a8e4711f7b265d0ad72e60e
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/loader/PaperClasspathBuilder.java
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,50 @@
 +package io.papermc.paper.plugin.loader;
 +
 +import io.papermc.paper.plugin.loader.library.PaperLibraryStore;
 +import io.papermc.paper.plugin.provider.PluginProvider;
-+import io.papermc.paper.plugin.provider.loader.PluginClasspathBuilder;
-+import io.papermc.paper.plugin.provider.loader.library.ClassPathLibrary;
++import io.papermc.paper.plugin.loader.library.ClassPathLibrary;
 +import io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoader;
 +import org.jetbrains.annotations.NotNull;
 +
@@ -589,13 +1346,12 @@ index 0000000000000000000000000000000000000000..f47c3d3f519e702c70885673a54889e5
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/loader/library/PaperLibraryStore.java b/src/main/java/io/papermc/paper/plugin/loader/library/PaperLibraryStore.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..ae3a706823b92763f8f0af7d253a917e4c4632e3
+index 0000000000000000000000000000000000000000..5fcce65009f715d46dd3013f1f92ec8393d66e15
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/loader/library/PaperLibraryStore.java
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,21 @@
 +package io.papermc.paper.plugin.loader.library;
 +
-+import io.papermc.paper.plugin.provider.loader.library.LibraryStore;
 +import org.jetbrains.annotations.NotNull;
 +
 +import java.nio.file.Path;
@@ -617,13 +1373,13 @@ index 0000000000000000000000000000000000000000..ae3a706823b92763f8f0af7d253a917e
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..412d392f667e4a6d53c41e8162239c5e80eece90
+index 0000000000000000000000000000000000000000..3f0a0dadb1061b29b919729f3aea388986cdca14
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
 @@ -0,0 +1,33 @@
 +package io.papermc.paper.plugin.provider;
 +
-+import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
 +import org.jetbrains.annotations.ApiStatus;
 +import org.jetbrains.annotations.NotNull;
 +
@@ -721,10 +1477,10 @@ index 0000000000000000000000000000000000000000..6ba3bcc468c0a60c76d6d0f0243bda66
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..87a93b47be68cd75fb81579dee88939f8791ffb7
+index 0000000000000000000000000000000000000000..93e816ef943d7bfb132219a7fe0e55d84500bdf6
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
-@@ -0,0 +1,210 @@
+@@ -0,0 +1,211 @@
 +package io.papermc.paper.plugin.provider.configuration;
 +
 +import com.google.common.collect.ImmutableList;
@@ -733,6 +1489,7 @@ index 0000000000000000000000000000000000000000..87a93b47be68cd75fb81579dee88939f
 +import io.papermc.paper.configuration.serializer.ComponentSerializer;
 +import io.papermc.paper.configuration.serializer.EnumValueSerializer;
 +import io.papermc.paper.configuration.serializer.collections.MapSerializer;
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
 +import io.papermc.paper.plugin.provider.configuration.serializer.ImmutableListSerializer;
 +import io.papermc.paper.plugin.provider.configuration.serializer.PermissionConfigurationSerializer;
 +import io.papermc.paper.plugin.provider.configuration.serializer.constraints.PluginConfigConstraints;
@@ -1284,13 +2041,13 @@ index 0000000000000000000000000000000000000000..a180612a1ec395202dbae1ca5b97ec01
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperClassloaderBytecodeModifier.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperClassloaderBytecodeModifier.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..a0a3fc2886c2381bf42468797ea1e64d39e2d4d0
+index 0000000000000000000000000000000000000000..9cfac374ac7288b458f01abb77ddf68e7d21a9e0
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperClassloaderBytecodeModifier.java
 @@ -0,0 +1,17 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
-+import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
 +import io.papermc.paper.plugin.provider.service.classloader.bytecode.ClassloaderBytecodeModifier;
 +
 +// Stub, implement in future.
@@ -1307,13 +2064,14 @@ index 0000000000000000000000000000000000000000..a0a3fc2886c2381bf42468797ea1e64d
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..c1863aeaf4767c0e7c75dde60fc1c0c908a75aa1
+index 0000000000000000000000000000000000000000..530069307e58291c4c570b8640a6950d85a17900
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
 @@ -0,0 +1,189 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
-+import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.UnsupportedBukkitPluginLoader;
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
 +import org.bukkit.Bukkit;
 +import org.bukkit.configuration.serialization.ConfigurationSerializable;
 +import org.bukkit.configuration.serialization.ConfigurationSerialization;
@@ -1421,7 +2179,6 @@ index 0000000000000000000000000000000000000000..c1863aeaf4767c0e7c75dde60fc1c0c9
 +
 +    @Override
 +    public void init(JavaPlugin plugin) {
-+        PluginLoader pluginLoader = ((SimplePluginManager) Bukkit.getPluginManager()).loader;
 +        PluginConfiguration config = this.configuration;
 +        PluginDescriptionFile pluginDescriptionFile = new PluginDescriptionFile(
 +            config.getIdentifier(),
@@ -1449,7 +2206,7 @@ index 0000000000000000000000000000000000000000..c1863aeaf4767c0e7c75dde60fc1c0c9
 +
 +        File dataFolder = new File(Bukkit.getPluginsFolder(), pluginDescriptionFile.getName());
 +        PaperPluginClassLoaderStorage.INSTANCE.add(this);
-+        plugin.init(pluginLoader, Bukkit.getServer(), pluginDescriptionFile, dataFolder, this.source.toFile(), this, config);
++        plugin.init(Bukkit.getServer(), pluginDescriptionFile, dataFolder, this.source.toFile(), this, config);
 +        plugin.logger = this.logger; // Paper - set logger
 +    }
 +
@@ -1502,13 +2259,13 @@ index 0000000000000000000000000000000000000000..c1863aeaf4767c0e7c75dde60fc1c0c9
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..fb470d0956c8c5b94d8aa868357f59fcdcb835ed
+index 0000000000000000000000000000000000000000..3c0a3ff7d3bcb244bfede6af189ab0055dda30de
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java
 @@ -0,0 +1,120 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
-+import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
 +import io.papermc.paper.plugin.provider.service.classloader.bytecode.ClassloaderBytecodeModifier;
 +import io.papermc.paper.plugin.provider.util.NamespaceChecker;
 +import org.jetbrains.annotations.ApiStatus;
@@ -1674,103 +2431,19 @@ index 0000000000000000000000000000000000000000..a41001f863e7d4a3adb7e9ea23cf0abd
 +
 +    <T extends PluginProvider<?>> void register(Entrypoint<T> entrypoint, T provider);
 +}
-diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/RuntimePluginEntrypointHandler.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/RuntimePluginEntrypointHandler.java
-new file mode 100644
-index 0000000000000000000000000000000000000000..2298353260b6d158c1f88d7996ac7f7bc052aebc
---- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/RuntimePluginEntrypointHandler.java
-@@ -0,0 +1,76 @@
-+package io.papermc.paper.plugin.provider.service.entrypoint;
-+
-+import com.destroystokyo.paper.util.SneakyThrow;
-+import io.papermc.paper.plugin.PaperPluginManager;
-+import io.papermc.paper.plugin.provider.PluginProvider;
-+import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.ServerPluginProviderStorage;
-+import org.bukkit.plugin.InvalidPluginException;
-+import org.bukkit.plugin.UnknownDependencyException;
-+import org.bukkit.plugin.java.JavaPlugin;
-+
-+import java.util.ArrayList;
-+import java.util.List;
-+
-+/**
-+ * Used for loading plugins during runtime, only supporting providers that are plugins.
-+ * Only registers one provider.
-+ */
-+// TODO: Refactor this to support multiple captured providers
-+public class RuntimePluginEntrypointHandler implements EntrypointHandler {
-+
-+    private PluginProvider<JavaPlugin> capturedProvider;
-+    private final PaperPluginManager pluginManager;
-+
-+    private JavaPlugin provided;
-+
-+    public RuntimePluginEntrypointHandler(PaperPluginManager pluginManager) {
-+        this.pluginManager = pluginManager;
-+    }
-+
-+    @Override
-+    public void enter(Entrypoint<?> entrypoint) {
-+        if (entrypoint != Entrypoint.PLUGIN) {
-+            throw new IllegalArgumentException("Only plugin entrypoint supported");
-+        }
-+        if (this.capturedProvider == null) {
-+            // This shouldn't happen as plugin types should register providers, and if something failed in the plugin loading process
-+            // it should properly fail before reaching this point.
-+            throw new IllegalStateException("Plugin didn't register provider?");
-+        }
-+
-+        PluginProvider<JavaPlugin> provider = this.capturedProvider;
-+        List<String> missingDependencies = new ArrayList<>();
-+        for (String dependency : provider.getConfiguration().getHardDependencies()) {
-+            if (!this.pluginManager.isPluginEnabled(dependency)) {
-+                missingDependencies.add(dependency);
-+            }
-+        }
-+        if (!missingDependencies.isEmpty()) {
-+            SneakyThrow.sneaky(new UnknownDependencyException(missingDependencies, provider.getFileName().toString()));
-+        }
-+
-+        JavaPlugin plugin = provider.createInstance();
-+        plugin.onLoad();
-+        ServerPluginProviderStorage.setupJavaplugin(plugin);
-+        this.provided = plugin;
-+    }
-+
-+    @SuppressWarnings("unchecked")
-+    @Override
-+    public <T extends PluginProvider<?>> void register(Entrypoint<T> entrypoint, T provider) {
-+        if (entrypoint != Entrypoint.PLUGIN) {
-+            SneakyThrow.sneaky(new InvalidPluginException("Plugin cannot register entrypoints other than PLUGIN during runtime. Tried registering %s!".formatted(entrypoint)));
-+            // We have to throw an invalid plugin exception for legacy reasons
-+        }
-+        // Shouldn't happen under normal circumstances, as the server controls plugin provider registering.
-+        if (this.capturedProvider != null) {
-+            SneakyThrow.sneaky(new InvalidPluginException("Cannot register multiple providers!"));
-+        }
-+
-+        this.capturedProvider = (PluginProvider<JavaPlugin>) provider;
-+    }
-+
-+    public JavaPlugin getProvided() {
-+        return this.provided;
-+    }
-+}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/ServerEntryPointHandler.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/ServerEntryPointHandler.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..f953cff236a0b145eb832328dd876766ce018cf8
+index 0000000000000000000000000000000000000000..4abd3933a645e5ac04661d9bb12d1a6e29465291
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/ServerEntryPointHandler.java
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,47 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint;
 +
 +import io.papermc.paper.plugin.provider.PluginProvider;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.BootstrapProviderStorage;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.ProviderStorage;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.ServerPluginProviderStorage;
-+import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
 +
-+import java.util.EnumMap;
 +import java.util.HashMap;
 +import java.util.Map;
 +
@@ -1902,13 +2575,14 @@ index 0000000000000000000000000000000000000000..f12a845bb4e8eddefb87849caf849f8a
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/ServerPluginProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/ServerPluginProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..2dc973fe2fc3c71d48202fc3f16e73e0af02227b
+index 0000000000000000000000000000000000000000..e284d637de0a76b27cb0525c19522a2299eed39d
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/ServerPluginProviderStorage.java
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,102 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin;
 +
 +import io.papermc.paper.configuration.GlobalConfiguration;
++import io.papermc.paper.plugin.PaperPluginManagerImpl;
 +import io.papermc.paper.plugin.provider.PluginProvider;
 +import io.papermc.paper.plugin.provider.configuration.PaperPluginConfiguration;
 +import io.papermc.paper.plugin.provider.configuration.type.PaperCommand;
@@ -1917,20 +2591,23 @@ index 0000000000000000000000000000000000000000..2dc973fe2fc3c71d48202fc3f16e73e0
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.PluginLoadingStrategy;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.impl.legacy.LegacyPluginLoadingStrategy;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.impl.modern.ModernPluginLoadingStrategy;
++import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.impl.modern.PluginGraphCycleException;
 +import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
 +import io.papermc.paper.plugin.provider.type.paper.PaperPluginProvider;
 +import org.bukkit.Bukkit;
 +import org.bukkit.command.Command;
 +import org.bukkit.command.PluginCommand;
-+import org.bukkit.plugin.Plugin;
-+import org.bukkit.plugin.SimplePluginManager;
 +import org.bukkit.plugin.java.JavaPlugin;
 +
 +import java.util.ArrayList;
 +import java.util.List;
 +import java.util.Map;
++import java.util.logging.Level;
++import java.util.logging.Logger;
 +
 +public class ServerPluginProviderStorage extends SimpleProviderStorage<JavaPluginProvider> {
++
++    private static final Logger LOGGER = Logger.getLogger("ServerPluginProviderStorage");
 +
 +    @Override
 +    public void enter() {
@@ -1948,8 +2625,26 @@ index 0000000000000000000000000000000000000000..2dc973fe2fc3c71d48202fc3f16e73e0
 +
 +        // Load paper plugin commands after they are loaded
 +        // We have to use our own separate process
-+        for (JavaPlugin plugin : strategy.loadPlugins(providerList)) {
-+            setupJavaplugin(plugin);
++        try {
++            for (JavaPlugin plugin : strategy.loadPlugins(providerList)) {
++                setupJavaplugin(plugin);
++            }
++        } catch (PluginGraphCycleException exception) {
++            List<String> logMessages = new ArrayList<>();
++            for (List<String> list : exception.getCycles()) {
++                // CoolPlugin depends on Dependency depends on CoolPlugin...
++                logMessages.add(String.join(" depends on ", list) + " depends on " + list.get(0) + "...");
++            }
++
++            LOGGER.log(Level.SEVERE, "Circular dependencies detected!");
++            LOGGER.log(Level.SEVERE, "You have a plugin that is depending on a plugin which refers back to that plugin. Your server will shut down until these are resolved, or the strategy is changed.");
++            LOGGER.log(Level.SEVERE, "Circular dependencies:");
++            for (String message : logMessages) {
++                LOGGER.log(Level.SEVERE, message);
++            }
++            LOGGER.log(Level.SEVERE, "If you would like to still load these plugins, acknowledging that there may be unexpected plugin loading issues, change plugin-loading-strategy in paper-global.yml to LEGACY.");
++
++            System.exit(-1);
 +        }
 +    }
 +
@@ -1982,7 +2677,7 @@ index 0000000000000000000000000000000000000000..2dc973fe2fc3c71d48202fc3f16e73e0
 +            }
 +        }
 +
-+        ((SimplePluginManager) Bukkit.getPluginManager()).pluginManager.loadPlugin(plugin);
++        ((PaperPluginManagerImpl) Bukkit.getPluginManager()).loadPlugin(plugin);
 +    }
 +
 +}
@@ -2018,7 +2713,7 @@ index 04db26520c87173e7bcc2d8408eec8ea7769eaa9..16fdc1a042b2cef51273208faf836f66
  
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/legacy/LegacyPluginLoadingStrategy.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/legacy/LegacyPluginLoadingStrategy.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..142ca38208535dd23c4f1e38abb2b31d9b09a5de
+index 0000000000000000000000000000000000000000..e0d07275fffb9e9c4b6fc6cd8ddafd3d78cd4276
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/legacy/LegacyPluginLoadingStrategy.java
 @@ -0,0 +1,245 @@
@@ -2027,7 +2722,7 @@ index 0000000000000000000000000000000000000000..142ca38208535dd23c4f1e38abb2b31d
 +import com.google.common.graph.GraphBuilder;
 +import com.google.common.graph.MutableGraph;
 +import io.papermc.paper.plugin.provider.PluginProvider;
-+import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.PluginLoadingStrategy;
 +import org.bukkit.plugin.UnknownDependencyException;
 +import org.bukkit.plugin.java.JavaPlugin;
@@ -2269,13 +2964,14 @@ index 0000000000000000000000000000000000000000..142ca38208535dd23c4f1e38abb2b31d
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/GraphCycleException.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/GraphCycleException.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..bf44031b4f81fdca37251d7fac93870a452526f5
+index 0000000000000000000000000000000000000000..815a65a322c13d132f90aa76481af1f1abbf5e32
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/GraphCycleException.java
-@@ -0,0 +1,4 @@
+@@ -0,0 +1,5 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.impl.modern;
 +
-+public class GraphCycleException extends Exception {
++public class GraphCycleException extends RuntimeException {
++
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/JohnsonSimpleCycles.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/JohnsonSimpleCycles.java
 new file mode 100644
@@ -2629,17 +3325,17 @@ index 0000000000000000000000000000000000000000..8f94ae60ed5343d138323cb7097ac0d8
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/ModernPluginLoadingStrategy.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/ModernPluginLoadingStrategy.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..f013fc5b6f72df93f0eda1fbe4aa169bd869feb3
+index 0000000000000000000000000000000000000000..bc2b9b777e1c80c990048082c9bdcc3d70c6af43
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/ModernPluginLoadingStrategy.java
-@@ -0,0 +1,139 @@
+@@ -0,0 +1,116 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.impl.modern;
 +
 +import com.google.common.collect.Lists;
 +import com.google.common.graph.GraphBuilder;
 +import com.google.common.graph.MutableGraph;
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
 +import io.papermc.paper.plugin.provider.PluginProvider;
-+import io.papermc.paper.plugin.provider.configuration.PluginConfiguration;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.PluginLoadingStrategy;
 +import org.bukkit.plugin.UnknownDependencyException;
 +import org.bukkit.plugin.java.JavaPlugin;
@@ -2723,33 +3419,10 @@ index 0000000000000000000000000000000000000000..f013fc5b6f72df93f0eda1fbe4aa169b
 +        try {
 +            reversedTopographicSort = Lists.reverse(TopographicGraphSorter.sortGraph(dependencyGraph));
 +        } catch (GraphCycleException e) {
-+            List<String> logMessages = new ArrayList<>();
-+            for (List<String> list : new JohnsonSimpleCycles<>(dependencyGraph).findSimpleCycles()) {
-+                // CoolPlugin depends on Dependency depends on CoolPlugin...
-+                for (int i = 0; i < list.size(); i++) {
-+                    String dependency = list.get(0);
-+                    if (providerMap.containsKey(dependency)) {
-+                        list.set(0, "[PLUGIN] " + dependency);
-+                    }
-+
-+                }
-+                logMessages.add(String.join(" depends on ", list) + " depends on " + list.get(0) + "...");
-+            }
-+
-+            LOGGER.log(Level.SEVERE, "Circular dependencies detected!");
-+            LOGGER.log(Level.SEVERE, "You have a plugin that is depending on a plugin which refers back to that plugin. Your server will shut down until these are resolved, or the strategy is changed.");
-+            LOGGER.log(Level.SEVERE, "Circular dependencies:");
-+            for (String message : logMessages) {
-+                LOGGER.log(Level.SEVERE, message);
-+            }
-+            LOGGER.log(Level.SEVERE, "If you would like to still load these plugins, acknowledging that there may be unexpected plugin loading issues, change plugin-loading-strategy in paper-global.yml to LEGACY.");
-+
-+            System.exit(-1);
-+            return List.of();
++            throw new PluginGraphCycleException(new JohnsonSimpleCycles<>(dependencyGraph).findSimpleCycles());
 +        }
 +
 +        List<JavaPlugin> loadedPlugins = new ArrayList<>();
-+        System.out.println(reversedTopographicSort);
 +        for (String providerIdentifier : reversedTopographicSort) {
 +            // It's possible that this will be null because the above dependencies for soft/load before aren't validated if they exist.
 +            // The graph could be MutableGraph<PluginProvider<JavaPlugin>>, but we would have to check if each dependency exists there... just
@@ -2772,9 +3445,30 @@ index 0000000000000000000000000000000000000000..f013fc5b6f72df93f0eda1fbe4aa169b
 +        return loadedPlugins;
 +    }
 +}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/PluginGraphCycleException.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/PluginGraphCycleException.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..90ecff087652c5e31d42682754b6242f31c012f2
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/PluginGraphCycleException.java
+@@ -0,0 +1,15 @@
++package io.papermc.paper.plugin.provider.service.entrypoint.storage.plugin.strategy.impl.modern;
++
++import java.util.List;
++
++public class PluginGraphCycleException extends RuntimeException {
++    private final List<List<String>> cycles;
++
++    public PluginGraphCycleException(List<List<String>> cycles) {
++        this.cycles = cycles;
++    }
++
++    public List<List<String>> getCycles() {
++        return this.cycles;
++    }
++}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/TopographicGraphSorter.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/TopographicGraphSorter.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..6092e7dbb4b09e379beea4c67a55f860816fcc3a
+index 0000000000000000000000000000000000000000..50c5751f48ad290d73033caf908be07b16e34386
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/plugin/strategy/impl/modern/TopographicGraphSorter.java
 @@ -0,0 +1,52 @@
@@ -2787,7 +3481,7 @@ index 0000000000000000000000000000000000000000..6092e7dbb4b09e379beea4c67a55f860
 +public class TopographicGraphSorter {
 +
 +    // Topographically sort dependencies
-+    public static <N> List<N> sortGraph(Graph<N> graph) throws GraphCycleException {
++    public static <N> List<N> sortGraph(Graph<N> graph) throws PluginGraphCycleException {
 +        List<N> sorted = new ArrayList<>();
 +        Deque<N> roots = new ArrayDeque<>();
 +        Map<N, Integer> nonRoots = new HashMap<>();
@@ -3018,10 +3712,10 @@ index 0000000000000000000000000000000000000000..c7b16e25a140e51ef4dfbba3d036acf6
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java b/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..efae8127990f420f753f62b34e97ff0d338e6f92
+index 0000000000000000000000000000000000000000..4c1f641db508ea7a6997ccedddc63c1a58f521c6
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java
-@@ -0,0 +1,67 @@
+@@ -0,0 +1,69 @@
 +package io.papermc.paper.plugin.provider.type;
 +
 +import io.papermc.paper.plugin.provider.PluginProvider;
@@ -3071,8 +3765,10 @@ index 0000000000000000000000000000000000000000..efae8127990f420f753f62b34e97ff0d
 +        this.factory = factory;
 +    }
 +
-+    public void register(EntrypointHandler entrypointHandler, JarFile file, Path context) throws Exception  {
-+        this.register(entrypointHandler, this.factory.build(file, file.getJarEntry(this.config), context));
++    public T register(EntrypointHandler entrypointHandler, JarFile file, Path context) throws Exception  {
++        T provider = this.factory.build(file, file.getJarEntry(this.config), context);
++        this.register(entrypointHandler, provider);
++        return provider;
 +    }
 +
 +    protected abstract void register(EntrypointHandler entrypointHandler, T provider);
@@ -3412,10 +4108,10 @@ index 0000000000000000000000000000000000000000..9868be521c0fe0d9a060bee78d1b28ef
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..5b0b5ae82c3d0abfb6a6977d13b4290438800f5d
+index 0000000000000000000000000000000000000000..17efff4a840450d1c5a8521835552a411f257fb1
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,159 @@
 +package io.papermc.paper.plugin.provider.type.spigot;
 +
 +import com.destroystokyo.paper.util.SneakyThrow;
@@ -3425,18 +4121,26 @@ index 0000000000000000000000000000000000000000..5b0b5ae82c3d0abfb6a6977d13b42904
 +import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
 +import io.papermc.paper.plugin.provider.type.PluginProviderFactory;
 +import org.bukkit.Bukkit;
-+import org.bukkit.plugin.PluginDescriptionFile;
-+import org.bukkit.plugin.SimplePluginManager;
++import org.bukkit.Server;
++import org.bukkit.plugin.*;
 +import org.bukkit.plugin.java.JavaPlugin;
++import org.bukkit.plugin.java.JavaPluginLoader;
++import org.bukkit.plugin.java.LibraryLoader;
++import org.bukkit.plugin.java.PluginClassLoader;
 +import org.jetbrains.annotations.NotNull;
 +
++import java.io.File;
 +import java.nio.file.Path;
++import java.util.HashSet;
++import java.util.Set;
 +import java.util.jar.JarFile;
++import java.util.logging.Level;
 +import java.util.logging.Logger;
 +
 +public class SpigotPluginProvider extends JavaPluginProvider implements ProviderStatusHolder {
 +
 +    public static final PluginProviderFactory<SpigotPluginProvider> FACTORY = new SpigotPluginProviderFactory();
++    private static final LibraryLoader LIBRARY_LOADER = new LibraryLoader(Logger.getLogger("SpigotLibraryLoader"));
 +
 +    private ProviderStatus status;
 +
@@ -3465,12 +4169,76 @@ index 0000000000000000000000000000000000000000..5b0b5ae82c3d0abfb6a6977d13b42904
 +
 +    @Override
 +    public JavaPlugin createInstance() {
++        Server server = Bukkit.getServer();
 +        try {
-+            SimplePluginManager simplePluginManager = (SimplePluginManager) Bukkit.getPluginManager();
-+            JavaPlugin plugin = (JavaPlugin) simplePluginManager.loader.loadPlugin(this.description, this.path.toFile());
++
++            final File parentFile = server.getPluginsFolder(); // Paper
++            final File dataFolder = new File(parentFile, description.getName());
++            @SuppressWarnings("deprecation")
++            final File oldDataFolder = new File(parentFile, description.getRawName());
++
++            // Found old data folder
++            if (dataFolder.equals(oldDataFolder)) {
++                // They are equal -- nothing needs to be done!
++            } else if (dataFolder.isDirectory() && oldDataFolder.isDirectory()) {
++                server.getLogger().warning(String.format(
++                    "While loading %s (%s) found old-data folder: `%s' next to the new one `%s'",
++                    description.getFullName(),
++                    path,
++                    oldDataFolder,
++                    dataFolder
++                ));
++            } else if (oldDataFolder.isDirectory() && !dataFolder.exists()) {
++                if (!oldDataFolder.renameTo(dataFolder)) {
++                    throw new InvalidPluginException("Unable to rename old data folder: `" + oldDataFolder + "' to: `" + dataFolder + "'");
++                }
++                server.getLogger().log(Level.INFO, String.format(
++                    "While loading %s (%s) renamed data folder: `%s' to `%s'",
++                    description.getFullName(),
++                    path,
++                    oldDataFolder,
++                    dataFolder
++                ));
++            }
++
++            if (dataFolder.exists() && !dataFolder.isDirectory()) {
++                throw new InvalidPluginException(String.format(
++                    "Projected datafolder: `%s' for %s (%s) exists and is not a directory",
++                    dataFolder,
++                    description.getFullName(),
++                    path
++                ));
++            }
++
++            Set<String> missingHardDependencies = new HashSet<>(description.getDepend().size()); // Paper - list all missing hard depends
++            for (final String pluginName : description.getDepend()) {
++                Plugin current = server.getPluginManager().getPlugin(pluginName);
++
++                if (current == null) {
++                    missingHardDependencies.add(pluginName); // Paper - list all missing hard depends
++                }
++            }
++            // Paper start - list all missing hard depends
++            if (!missingHardDependencies.isEmpty()) {
++                throw new UnknownDependencyException(missingHardDependencies, description.getFullName());
++            }
++            // Paper end
++
++            server.getUnsafe().checkSupported(description);
++
++            final PluginClassLoader loader;
++            try {
++                loader = new PluginClassLoader(getClass().getClassLoader(), description, dataFolder, path.toFile(), LIBRARY_LOADER.createLoader(description)); // Paper
++            } catch (InvalidPluginException ex) {
++                throw ex;
++            } catch (Throwable ex) {
++                throw new InvalidPluginException(ex);
++            }
++
++            io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoaderStorage.INSTANCE.add(loader); // Paper
 +
 +            this.status = ProviderStatus.INITIALIZED;
-+            return plugin;
++            return loader.plugin;
 +        } catch (Throwable ex) {
 +            this.status = ProviderStatus.ERRORED;
 +            SneakyThrow.sneaky(ex);
@@ -3581,38 +4349,86 @@ index 0a843e0afbcb1af8e2641515eb244b791b819b8c..5d563a8c9520a348b61b7122cead76aa
              Util.startTimerHackThread();
              Path path = Paths.get("server.properties");
 diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..5f14581674a41710e0f702e484fc691f7073139b 100644
+index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..eb2f1ccc56648f3584af48287d1b00f4006c1ffc 100644
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-@@ -305,6 +305,7 @@ public final class CraftServer implements Server {
-         this.structureManager = new CraftStructureManager(console.getStructureManager());
- 
-         Bukkit.setServer(this);
-+        this.pluginManager.pluginManager = new io.papermc.paper.plugin.PaperPluginManagerImpl(this.commandMap, this.pluginManager, this);
- 
-         // Register all the Enchantments and PotionTypes now so we can stop new registration immediately after
-         Enchantments.SHARPNESS.getClass();
-@@ -410,7 +411,8 @@ public final class CraftServer implements Server {
+@@ -255,7 +255,7 @@ public final class CraftServer implements Server {
+     private final CraftCommandMap commandMap = new CraftCommandMap(this);
+     private final SimpleHelpMap helpMap = new SimpleHelpMap(this);
+     private final StandardMessenger messenger = new StandardMessenger();
+-    private final SimplePluginManager pluginManager = new SimplePluginManager(this, this.commandMap);
++    private final io.papermc.paper.plugin.PaperPluginManagerImpl pluginManager = new io.papermc.paper.plugin.PaperPluginManagerImpl(this, this.commandMap); // Paper
+     private final StructureManager structureManager;
+     protected final DedicatedServer console;
+     protected final DedicatedPlayerList playerList;
+@@ -357,7 +357,7 @@ public final class CraftServer implements Server {
+         this.saveCommandsConfig();
+         this.overrideAllCommandBlockCommands = this.commandsConfiguration.getStringList("command-block-overrides").contains("*");
+         this.ignoreVanillaPermissions = this.commandsConfiguration.getBoolean("ignore-vanilla-permissions");
+-        this.pluginManager.useTimings(this.configuration.getBoolean("settings.plugin-profiling"));
++        co.aikar.timings.Timings.setTimingsEnabled(this.configuration.getBoolean("settings.plugin-profiling")); // Paper
+         this.overrideSpawnLimits();
+         console.autosavePeriod = this.configuration.getInt("ticks-per.autosave");
+         this.warningState = WarningState.value(this.configuration.getString("settings.deprecated-verbose"));
+@@ -409,29 +409,7 @@ public final class CraftServer implements Server {
+     }
  
      public void loadPlugins() {
-         this.pluginManager.registerInterface(JavaPluginLoader.class);
+-        this.pluginManager.registerInterface(JavaPluginLoader.class);
 -
-+        io.papermc.paper.plugin.provider.service.entrypoint.ServerEntryPointHandler.INSTANCE.enter(io.papermc.paper.plugin.provider.service.entrypoint.Entrypoint.PLUGIN);
-+        if (true) return;
-         File pluginFolder = this.getPluginsFolder(); // Paper
+-        File pluginFolder = this.getPluginsFolder(); // Paper
+-
+-        // Paper start
+-        if (true || pluginFolder.exists()) {
+-            if (!pluginFolder.exists()) {
+-                pluginFolder.mkdirs();
+-            }
+-            Plugin[] plugins = this.pluginManager.loadPlugins(pluginFolder, this.extraPluginJars());
+-            // Paper end
+-            for (Plugin plugin : plugins) {
+-                try {
+-                    String message = String.format("Loading %s", plugin.getDescription().getFullName());
+-                    plugin.getLogger().info(message);
+-                    plugin.onLoad();
+-                } catch (Throwable ex) {
+-                    Logger.getLogger(CraftServer.class.getName()).log(Level.SEVERE, ex.getMessage() + " initializing " + plugin.getDescription().getFullName() + " (Is it up to date?)", ex);
+-                }
+-            }
+-        } else {
+-            pluginFolder.mkdir();
+-        }
++        io.papermc.paper.plugin.provider.service.entrypoint.ServerEntryPointHandler.INSTANCE.enter(io.papermc.paper.plugin.provider.service.entrypoint.Entrypoint.PLUGIN); // Paper - replace implementation
+     }
  
-         // Paper start
+     // Paper start
+@@ -2790,7 +2768,7 @@ public final class CraftServer implements Server {
+ 
+     @Override
+     public void reloadPermissions() {
+-        pluginManager.clearPermissions();
++        this.pluginManager.clearPermissions();
+         if (io.papermc.paper.configuration.GlobalConfiguration.get().misc.loadPermissionsYmlBeforePlugins) loadCustomPermissions();
+         for (Plugin plugin : pluginManager.getPlugins()) {
+             for (Permission perm : plugin.getDescription().getPermissions()) {
 diff --git a/src/main/java/org/bukkit/craftbukkit/scheduler/MinecraftInternalPlugin.java b/src/main/java/org/bukkit/craftbukkit/scheduler/MinecraftInternalPlugin.java
-index 909b2c98e7a9117d2f737245e4661792ffafb744..0aadfacf70adc48be64a8129e8a2f499f967abbc 100644
+index 909b2c98e7a9117d2f737245e4661792ffafb744..239dca464dd63ce557c0036c940be902ef340aa9 100644
 --- a/src/main/java/org/bukkit/craftbukkit/scheduler/MinecraftInternalPlugin.java
 +++ b/src/main/java/org/bukkit/craftbukkit/scheduler/MinecraftInternalPlugin.java
-@@ -42,6 +42,12 @@ public class MinecraftInternalPlugin extends PluginBase {
+@@ -1,6 +1,7 @@
+ package org.bukkit.craftbukkit.scheduler;
+ 
+ 
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
+ import org.bukkit.Server;
+ import org.bukkit.command.Command;
+ import org.bukkit.command.CommandSender;
+@@ -42,6 +43,12 @@ public class MinecraftInternalPlugin extends PluginBase {
      public PluginDescriptionFile getDescription() {
          return pdf;
      }
 +    // Paper start
 +    @Override
-+    public io.papermc.paper.plugin.provider.configuration.PluginConfiguration getConfiguration() {
++    public PluginConfiguration getConfiguration() {
 +        return pdf;
 +    }
 +    // Paper end

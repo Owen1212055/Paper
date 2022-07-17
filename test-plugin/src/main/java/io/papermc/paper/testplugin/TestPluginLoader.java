@@ -1,17 +1,12 @@
 package io.papermc.paper.testplugin;
 
 import io.papermc.paper.plugin.loader.PluginLoader;
-import io.papermc.paper.plugin.provider.loader.PluginClasspathBuilder;
-import io.papermc.paper.plugin.provider.loader.library.impl.maven.MavenLibraryResolver;
+import io.papermc.paper.plugin.loader.PluginClasspathBuilder;
+import io.papermc.paper.plugin.loader.library.impl.maven.MavenLibraryResolver;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.graph.Dependency;
-import org.eclipse.aether.graph.DependencyFilter;
-import org.eclipse.aether.graph.DependencyNode;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.jetbrains.annotations.NotNull;
-
-import java.lang.invoke.MethodHandle;
-import java.util.List;
 
 public class TestPluginLoader implements PluginLoader {
     @Override

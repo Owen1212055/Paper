@@ -1,8 +1,10 @@
 package io.papermc.paper.testplugin;
 
+import org.bukkit.Bukkit;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
 import java.util.logging.Level;
 
 public final class TestPlugin extends JavaPlugin implements Listener {
@@ -26,6 +28,11 @@ public final class TestPlugin extends JavaPlugin implements Listener {
             System.out.println(Class.forName("com.owen1212055.particlehelper.api.ParticleHelper"));
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
+        }
+        try {
+            System.out.println(Bukkit.getPluginManager().loadPlugin(new File("debuggery.jar")));
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
