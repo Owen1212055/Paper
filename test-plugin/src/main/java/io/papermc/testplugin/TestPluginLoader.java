@@ -1,4 +1,4 @@
-package io.papermc.paper.testplugin;
+package io.papermc.testplugin;
 
 import io.papermc.paper.plugin.loader.PluginLoader;
 import io.papermc.paper.plugin.loader.PluginClasspathBuilder;

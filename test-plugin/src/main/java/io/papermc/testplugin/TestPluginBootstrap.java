@@ -1,4 +1,4 @@
-package io.papermc.paper.testplugin;
+package io.papermc.testplugin;
 
 import io.papermc.paper.plugin.bootstrap.PluginBootstrap;
 import io.papermc.paper.plugin.bootstrap.PluginBootstrapContext;

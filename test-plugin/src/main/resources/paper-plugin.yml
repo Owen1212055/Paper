@@ -1,12 +1,12 @@
 name: Paper-Test-Plugin
 version: ${version}
-main: io.papermc.paper.testplugin.TestPlugin
+main: io.papermc.testplugin.TestPlugin
 description: Paper Test Plugin
 author: PaperMC
 api-version: ${apiversion}
 load: STARTUP
-bootstrapper: io.papermc.paper.testplugin.TestPluginBootstrap
-loader: io.papermc.paper.testplugin.TestPluginLoader
+bootstrapper: io.papermc.testplugin.TestPluginBootstrap
+loader: io.papermc.testplugin.TestPluginLoader
 defaultPerm: FALSE
 permissions:
   test.plugin:

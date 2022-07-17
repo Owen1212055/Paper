@@ -675,7 +675,7 @@ index 0000000000000000000000000000000000000000..73e88e273aa78475b9ebb9537f93332a
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/PaperPluginInstanceManager.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..20be52115eb321891da5bde5d61be7baeae7bdd3
+index 0000000000000000000000000000000000000000..55076cd92abc5bb120ebba88290b600afa07a598
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/PaperPluginInstanceManager.java
 @@ -0,0 +1,302 @@
@@ -869,7 +869,7 @@ index 0000000000000000000000000000000000000000..20be52115eb321891da5bde5d61be7ba
 +
 +            try {
 +                String enableMsg = "Enabling " + plugin.getConfiguration().getDisplayName();
-+                if (org.bukkit.UnsafeValues.isLegacyPlugin(plugin)) {
++                if (plugin.getConfiguration() instanceof PluginDescriptionFile descriptionFile && descriptionFile.isLegacy()) {
 +                    enableMsg += "*";
 +                }
 +                plugin.getLogger().info(enableMsg);
@@ -923,9 +923,9 @@ index 0000000000000000000000000000000000000000..20be52115eb321891da5bde5d61be7ba
 +            javaPlugin.setEnabled(false);
 +
 +            ClassLoader classLoader = plugin.getClass().getClassLoader();
-+            if (classLoader instanceof URLClassLoader urlClassLoader && classLoader instanceof PluginClassloader) {
++            if (classLoader instanceof ConfiguredPluginClassLoader configuredPluginClassLoader) {
 +                try {
-+                    urlClassLoader.close();
++                    configuredPluginClassLoader.close();
 +                } catch (IOException ex) {
 +                    this.server.getLogger().log(Level.WARNING, "Error closing the classloader for '" + pluginName + "'", ex); // Paper - log exception
 +                }
@@ -1477,10 +1477,10 @@ index 0000000000000000000000000000000000000000..6ba3bcc468c0a60c76d6d0f0243bda66
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..93e816ef943d7bfb132219a7fe0e55d84500bdf6
+index 0000000000000000000000000000000000000000..33685509cedb0c0798f9320aef089194a4dc175f
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
-@@ -0,0 +1,211 @@
+@@ -0,0 +1,216 @@
 +package io.papermc.paper.plugin.provider.configuration;
 +
 +import com.google.common.collect.ImmutableList;
@@ -1541,6 +1541,9 @@ index 0000000000000000000000000000000000000000..93e816ef943d7bfb132219a7fe0e55d8
 +    private PluginLoadOrder load = PluginLoadOrder.POSTWORLD;
 +    @FlattenedResolver
 +    private PermissionConfiguration permissionConfiguration = new PermissionConfiguration(PermissionDefault.OP, List.of());
++
++    @Required
++    @PluginConfigConstraints.PluginVersion
 +    private String apiVersion = null;
 +
 +    private transient String displayName;
@@ -1564,6 +1567,8 @@ index 0000000000000000000000000000000000000000..93e816ef943d7bfb132219a7fe0e55d8
 +                            ObjectMapper.factoryBuilder()
 +                                .addConstraint(Constraint.class, new Constraint.Factory())
 +                                .addConstraint(PluginConfigConstraints.PluginName.class, String.class, new PluginConfigConstraints.PluginName.Factory())
++                                .addConstraint(PluginConfigConstraints.PluginVersion.class, String.class, new PluginConfigConstraints.PluginVersion.Factory())
++                                .addConstraint(PluginConfigConstraints.PluginNameSpace.class, String.class, new PluginConfigConstraints.PluginNameSpace.Factory())
 +                                .addNodeResolver(new FlattenedResolver.Factory())
 +                                .build()
 +                        );
@@ -1901,10 +1906,10 @@ index 0000000000000000000000000000000000000000..d1088e4b7fa5f8e689f23b150b83645c
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/constraints/PluginConfigConstraints.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/constraints/PluginConfigConstraints.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..512147433703826d8f06193c3bad7199ac409a26
+index 0000000000000000000000000000000000000000..c42f09edf6898483f0cedda68006d0ae2bfe99f3
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/constraints/PluginConfigConstraints.java
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,82 @@
 +package io.papermc.paper.plugin.provider.configuration.serializer.constraints;
 +
 +import io.papermc.paper.plugin.provider.util.NamespaceChecker;
@@ -1920,6 +1925,7 @@ index 0000000000000000000000000000000000000000..512147433703826d8f06193c3bad7199
 +public final class PluginConfigConstraints {
 +
 +    public static final Set<String> RESERVED_KEYS = Set.of("bukkit", "minecraft", "mojang", "spigot", "paper");
++    public static final Set<String> VALID_PAPER_VERSIONS = Set.of("1.19");
 +
 +    @Documented
 +    @Retention(RetentionPolicy.RUNTIME)
@@ -1955,13 +1961,31 @@ index 0000000000000000000000000000000000000000..512147433703826d8f06193c3bad7199
 +    @Target(ElementType.FIELD)
 +    public @interface PluginNameSpace {
 +
-+        final class Factory implements Constraint.Factory<PluginName, String> {
++        final class Factory implements Constraint.Factory<PluginNameSpace, String> {
 +
 +            @Override
-+            public Constraint<String> make(PluginName data, Type type) {
++            public Constraint<String> make(PluginNameSpace data, Type type) {
 +                return value -> {
 +                    if (value != null && !NamespaceChecker.isValidNameSpace(value)) {
 +                        throw new SerializationException("provided class '%s' is in an invalid namespace.".formatted(value));
++                    }
++                };
++            }
++        }
++    }
++
++    @Documented
++    @Retention(RetentionPolicy.RUNTIME)
++    @Target(ElementType.FIELD)
++    public @interface PluginVersion {
++
++        final class Factory implements Constraint.Factory<PluginVersion, String> {
++
++            @Override
++            public Constraint<String> make(PluginVersion data, Type type) {
++                return value -> {
++                    if (value != null && !VALID_PAPER_VERSIONS.contains(value)) {
++                        throw new SerializationException("Provided plugin's version (%s) is not supported on this version.".formatted(value));
 +                    }
 +                };
 +            }
@@ -4074,10 +4098,10 @@ index 0000000000000000000000000000000000000000..0bf4f8fde5eca51a828b321de37b37d5
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProviderFactory.java b/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProviderFactory.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..9868be521c0fe0d9a060bee78d1b28efe1550f32
+index 0000000000000000000000000000000000000000..9e06935a3141b22cf1fe6b199dda1d0fc16b24e9
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProviderFactory.java
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,26 @@
 +package io.papermc.paper.plugin.provider.type.paper;
 +
 +import io.papermc.paper.plugin.provider.configuration.PaperPluginConfiguration;
@@ -4099,8 +4123,6 @@ index 0000000000000000000000000000000000000000..9868be521c0fe0d9a060bee78d1b28ef
 +        PaperPluginConfiguration configuration;
 +        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(file.getInputStream(config)))) {
 +            configuration = PaperPluginConfiguration.create(bufferedReader);
-+        } catch (IOException | YAMLException ex) {
-+            throw new InvalidDescriptionException(ex);
 +        }
 +
 +        return new PaperParentProvider(source, file, configuration);
@@ -4108,7 +4130,7 @@ index 0000000000000000000000000000000000000000..9868be521c0fe0d9a060bee78d1b28ef
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..17efff4a840450d1c5a8521835552a411f257fb1
+index 0000000000000000000000000000000000000000..82b4dd444610ffd57e253a479d4b435d513e4bf2
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
 @@ -0,0 +1,159 @@
@@ -4268,7 +4290,7 @@ index 0000000000000000000000000000000000000000..17efff4a840450d1c5a8521835552a41
 +    }
 +
 +    public boolean isLegacy() {
-+        return !Bukkit.getUnsafe().isSupportedApiVersion(this.description.getAPIVersion());
++        return this.description.isLegacy();
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProviderFactory.java b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProviderFactory.java
@@ -4411,24 +4433,23 @@ index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..eb2f1ccc56648f3584af48287d1b00f4
          for (Plugin plugin : pluginManager.getPlugins()) {
              for (Permission perm : plugin.getDescription().getPermissions()) {
 diff --git a/src/main/java/org/bukkit/craftbukkit/scheduler/MinecraftInternalPlugin.java b/src/main/java/org/bukkit/craftbukkit/scheduler/MinecraftInternalPlugin.java
-index 909b2c98e7a9117d2f737245e4661792ffafb744..239dca464dd63ce557c0036c940be902ef340aa9 100644
+index 909b2c98e7a9117d2f737245e4661792ffafb744..2c1936d099f37152631cd8b7cf5f88b2f6db0a95 100644
 --- a/src/main/java/org/bukkit/craftbukkit/scheduler/MinecraftInternalPlugin.java
 +++ b/src/main/java/org/bukkit/craftbukkit/scheduler/MinecraftInternalPlugin.java
-@@ -1,6 +1,7 @@
+@@ -1,6 +1,5 @@
  package org.bukkit.craftbukkit.scheduler;
  
- 
-+import io.papermc.paper.plugin.configuration.PluginConfiguration;
+-
  import org.bukkit.Server;
  import org.bukkit.command.Command;
  import org.bukkit.command.CommandSender;
-@@ -42,6 +43,12 @@ public class MinecraftInternalPlugin extends PluginBase {
+@@ -42,6 +41,12 @@ public class MinecraftInternalPlugin extends PluginBase {
      public PluginDescriptionFile getDescription() {
          return pdf;
      }
 +    // Paper start
 +    @Override
-+    public PluginConfiguration getConfiguration() {
++    public io.papermc.paper.plugin.configuration.PluginConfiguration getConfiguration() {
 +        return pdf;
 +    }
 +    // Paper end

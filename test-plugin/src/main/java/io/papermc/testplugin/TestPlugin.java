@@ -1,4 +1,4 @@
-package io.papermc.paper.testplugin;
+package io.papermc.testplugin;
 
 import org.bukkit.Bukkit;
 import org.bukkit.event.Listener;

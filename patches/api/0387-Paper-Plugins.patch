@@ -255,12 +255,13 @@ index 0000000000000000000000000000000000000000..732d59c2f176f8ad80908db4d224cfb2
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/configuration/BukkitConfigurationWrapper.java b/src/main/java/io/papermc/paper/plugin/configuration/BukkitConfigurationWrapper.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..92d7679b3ff31dc7bb4708e3a664f6344e519261
+index 0000000000000000000000000000000000000000..53619dc8c2f2828643b433f7539c1035caa2bc9b
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/configuration/BukkitConfigurationWrapper.java
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,137 @@
 +package io.papermc.paper.plugin.configuration;
 +
++import org.bukkit.Bukkit;
 +import org.bukkit.permissions.Permission;
 +import org.bukkit.permissions.PermissionDefault;
 +import org.bukkit.plugin.PluginDescriptionFile;
@@ -389,6 +390,10 @@ index 0000000000000000000000000000000000000000..92d7679b3ff31dc7bb4708e3a664f634
 +        }
 +
 +        return nullable(strings);
++    }
++
++    default boolean isLegacy() {
++        return !Bukkit.getUnsafe().isSupportedApiVersion(this.spigotDescription().getAPIVersion());
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/configuration/PluginConfiguration.java b/src/main/java/io/papermc/paper/plugin/configuration/PluginConfiguration.java
@@ -1014,7 +1019,7 @@ index 0000000000000000000000000000000000000000..d332f21f3dd7426f26ee00c6e0247864
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/util/NamespaceChecker.java b/src/main/java/io/papermc/paper/plugin/provider/util/NamespaceChecker.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..1726825a808f77bef5a3d02fd89da1f717a03041
+index 0000000000000000000000000000000000000000..4efcd3eb41b8a93f8c2d606f2993ef1c7a8e677c
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/util/NamespaceChecker.java
 @@ -0,0 +1,37 @@
@@ -1040,7 +1045,7 @@ index 0000000000000000000000000000000000000000..1726825a808f77bef5a3d02fd89da1f7
 +     * @param name namespace
 +     */
 +    public static void validateNameSpaceForClassloading(@NotNull String name) throws ClassNotFoundException {
-+        if (isValidNameSpace(name)) {
++        if (!isValidNameSpace(name)) {
 +            throw new ClassNotFoundException(name);
 +        }
 +    }
@@ -1052,7 +1057,7 @@ index 0000000000000000000000000000000000000000..1726825a808f77bef5a3d02fd89da1f7
 +            }
 +        }
 +
-+        return false;
++        return true;
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/util/ProviderUtil.java b/src/main/java/io/papermc/paper/plugin/provider/util/ProviderUtil.java
@@ -1803,25 +1808,16 @@ index 345394132df70593800127d34a38f8f8a4dafe00..74b98deb1f003b6c6b785a937dcd0073
      // Paper end
  }
 diff --git a/src/test/java/org/bukkit/plugin/TestPlugin.java b/src/test/java/org/bukkit/plugin/TestPlugin.java
-index a8be3e23e3e280ad301d9530de50028515612966..c7640dfa175e92b6308c10984d99854e9e6cc7cb 100644
+index a8be3e23e3e280ad301d9530de50028515612966..ba743beb6f171bfea4fb17ef6858f73bb740f775 100644
 --- a/src/test/java/org/bukkit/plugin/TestPlugin.java
 +++ b/src/test/java/org/bukkit/plugin/TestPlugin.java
-@@ -3,6 +3,8 @@ package org.bukkit.plugin;
- import java.io.File;
- import java.io.InputStream;
- import java.util.List;
-+
-+import io.papermc.paper.plugin.configuration.PluginConfiguration;
- import org.bukkit.Server;
- import org.bukkit.command.Command;
- import org.bukkit.command.CommandSender;
-@@ -32,6 +34,12 @@ public class TestPlugin extends PluginBase {
+@@ -32,6 +32,12 @@ public class TestPlugin extends PluginBase {
      public PluginDescriptionFile getDescription() {
          return new PluginDescriptionFile(pluginName, "1.0", "test.test");
      }
 +    // Paper start
 +    @Override
-+    public PluginConfiguration getConfiguration() {
++    public io.papermc.paper.plugin.configuration.PluginConfiguration getConfiguration() {
 +        return getDescription();
 +    }
 +    // Paper end
