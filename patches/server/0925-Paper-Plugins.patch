@@ -241,10 +241,10 @@ index 0000000000000000000000000000000000000000..ff90f2e11f9576693fcf93af47ebca83
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/DependencyContext.java b/src/main/java/io/papermc/paper/plugin/DependencyContext.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..eb7d3da75c9bfe5fbc19ec4f6f1d44ee6c45335f
+index 0000000000000000000000000000000000000000..93e15901fcc2c9fbed2dd55e31df30d16314ceef
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/DependencyContext.java
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,18 @@
 +package io.papermc.paper.plugin;
 +
 +import io.papermc.paper.plugin.configuration.PluginConfiguration;
@@ -260,6 +260,7 @@ index 0000000000000000000000000000000000000000..eb7d3da75c9bfe5fbc19ec4f6f1d44ee
 +
 +    boolean isTransitiveDependency(PluginConfiguration plugin, PluginConfiguration depend);
 +
++    boolean hasDependency(String pluginIdentifier);
 +
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/DependencyContextHolder.java b/src/main/java/io/papermc/paper/plugin/DependencyContextHolder.java
@@ -278,10 +279,10 @@ index 0000000000000000000000000000000000000000..0188d4e42d9a06df38ed02803dca79b8
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/GraphDependencyContext.java b/src/main/java/io/papermc/paper/plugin/GraphDependencyContext.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..244986ff356ebcf19e85dc7b9243e5ca905c31e0
+index 0000000000000000000000000000000000000000..cabe9a56df7553f083a5c2525693b17a44360563
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/GraphDependencyContext.java
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,41 @@
 +package io.papermc.paper.plugin;
 +
 +import com.google.common.graph.Graph;
@@ -315,6 +316,11 @@ index 0000000000000000000000000000000000000000..244986ff356ebcf19e85dc7b9243e5ca
 +        }
 +
 +        return false;
++    }
++
++    @Override
++    public boolean hasDependency(String pluginIdentifier) {
++        return this.dependencyGraph.nodes().contains(pluginIdentifier);
 +    }
 +
 +}
@@ -865,10 +871,10 @@ index 0000000000000000000000000000000000000000..de58d2819bbee393cad8121cef0f9a86
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..ece6a4e010987901908e367ca77eb917ac1ab012
+index 0000000000000000000000000000000000000000..0c8cb24b2aae05472e48705acba164cf374cda4c
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
-@@ -0,0 +1,337 @@
+@@ -0,0 +1,341 @@
 +package io.papermc.paper.plugin.manager;
 +
 +import com.google.common.base.Preconditions;
@@ -1205,13 +1211,17 @@ index 0000000000000000000000000000000000000000..ece6a4e010987901908e367ca77eb917
 +
 +        return false;
 +    }
++
++    public boolean hasDependency(String pluginIdentifier) {
++        return this.isPluginEnabled(pluginIdentifier);
++    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginManagerImpl.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginManagerImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..c9a6c790662687ec963db13ad0c6d974c08e6400
+index 0000000000000000000000000000000000000000..b2376a024e5e42398b01493fec3641a88e3baf7e
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginManagerImpl.java
-@@ -0,0 +1,211 @@
+@@ -0,0 +1,216 @@
 +package io.papermc.paper.plugin.manager;
 +
 +import io.papermc.paper.plugin.DependencyContext;
@@ -1301,6 +1311,11 @@ index 0000000000000000000000000000000000000000..c9a6c790662687ec963db13ad0c6d974
 +    @Override
 +    public boolean isTransitiveDependency(PluginConfiguration pluginConfiguration, PluginConfiguration dependencyConfig) {
 +        return this.instanceManager.isTransitiveDepend(pluginConfiguration, dependencyConfig);
++    }
++
++    @Override
++    public boolean hasDependency(String pluginIdentifier) {
++        return this.instanceManager.hasDependency(pluginIdentifier);
 +    }
 +
 +    // Event manipulation
@@ -1590,10 +1605,10 @@ index 0000000000000000000000000000000000000000..6ba3bcc468c0a60c76d6d0f0243bda66
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..738c089120dac1d46602fdb5cd2d732fa73720a7
+index 0000000000000000000000000000000000000000..463fb14cd395837957943c35b80183d83784e602
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
-@@ -0,0 +1,208 @@
+@@ -0,0 +1,211 @@
 +package io.papermc.paper.plugin.provider.configuration;
 +
 +import com.google.common.collect.ImmutableList;
@@ -1660,6 +1675,9 @@ index 0000000000000000000000000000000000000000..738c089120dac1d46602fdb5cd2d732f
 +    private String apiVersion;
 +
 +    private transient String displayName;
++
++    public PaperPluginConfiguration() {
++    }
 +
 +    public static PaperPluginConfiguration create(BufferedReader reader) throws ConfigurateException {
 +        YamlConfigurationLoader loader = YamlConfigurationLoader.builder()
@@ -2121,10 +2139,10 @@ index 0000000000000000000000000000000000000000..824f32258c2cc6a2908eca573fa14ea6
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PaperCommandMap.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PaperCommandMap.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..19caf0f21fce960736c467bdf975558168b18696
+index 0000000000000000000000000000000000000000..8f0d84573ca232b02232b98306168cd18d3b8c9e
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PaperCommandMap.java
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,24 @@
 +package io.papermc.paper.plugin.provider.configuration.type;
 +
 +import org.spongepowered.configurate.objectmapping.ConfigSerializable;
@@ -2135,6 +2153,10 @@ index 0000000000000000000000000000000000000000..19caf0f21fce960736c467bdf9755581
 +public class PaperCommandMap {
 +
 +    private final Map<String, PaperCommand> commands;
++
++    public PaperCommandMap() {
++        this.commands = Map.of();
++    }
 +
 +    public PaperCommandMap(Map<String, PaperCommand> commands) {
 +        this.commands = commands;
@@ -2706,7 +2728,7 @@ index 0000000000000000000000000000000000000000..6a30e697c3391b9cef814f33e5eb3f75
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ConfiguredOrderedProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ConfiguredOrderedProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..03eb5251325eaeb61410cabae8341e31c9db4412
+index 0000000000000000000000000000000000000000..db3e979f570ddcfc80147d0c7160506ada7f6ad5
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ConfiguredOrderedProviderStorage.java
 @@ -0,0 +1,41 @@
@@ -2728,7 +2750,7 @@ index 0000000000000000000000000000000000000000..03eb5251325eaeb61410cabae8341e31
 +    // This doesn't work with reloading.
 +    // Should we care?
 +    public ConfiguredOrderedProviderStorage(ProviderLoader<T> onLoad) {
-+        super(Boolean.getBoolean("paper.useLegacyPluginLoading") ? new ModernPluginLoadingStrategy<>(onLoad) : new LegacyPluginLoadingStrategy<>(onLoad));
++        super(Boolean.getBoolean("paper.useLegacyPluginLoading") ? new LegacyPluginLoadingStrategy<>(onLoad) : new ModernPluginLoadingStrategy<>(onLoad));
 +    }
 +
 +    @Override
@@ -3565,10 +3587,10 @@ index 0000000000000000000000000000000000000000..b38b4cf226181afd750da3f3a843061c
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/ModernPluginLoadingStrategy.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/ModernPluginLoadingStrategy.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..75de090c4477e6f4c18049bba6efaf1f80c2a7a0
+index 0000000000000000000000000000000000000000..5eaa052ac5eca7381515f49777585b0ee6675827
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/ModernPluginLoadingStrategy.java
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,139 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy;
 +
 +import com.google.common.collect.Lists;
@@ -3608,9 +3630,25 @@ index 0000000000000000000000000000000000000000..75de090c4477e6f4c18049bba6efaf1f
 +                PluginConfiguration providerConfig = provider.getConfiguration();
 +
 +                // Populate provided into a map
-+                providerMap.put(providerConfig.getIdentifier(), provider);
++                PluginProvider<T> replacedProvider = providerMap.put(providerConfig.getIdentifier(), provider);
++                if (replacedProvider != null) {
++                    LOGGER.severe(String.format(
++                        "Ambiguous plugin name '%s' for files '%s' and '%s' in '%s'",
++                        providerConfig.getIdentifier(),
++                        provider.getSource(),
++                        replacedProvider.getSource(),
++                        replacedProvider.getParentSource()
++                    ));
++                }
++
 +                for (String provides : providerConfig.getProvides()) {
-+                    providerMap.put(provides, provider);
++                    PluginProvider<T> removedProvided = providerMap.put(provides, provider);
++                    if (removedProvided != null) {
++                        LOGGER.warning(
++                            "Ambiguous plugin name '%s'. It is also provided by '%s'".formatted(providerConfig.getIdentifier(), removedProvided)
++                        );
++                    }
++
 +                }
 +            }
 +
@@ -3677,10 +3715,15 @@ index 0000000000000000000000000000000000000000..75de090c4477e6f4c18049bba6efaf1f
 +            if (retrievedProvider == null) {
 +                continue; // Skip provider that doesn't exist....
 +            }
++
 +            this.onLoad.applyContext(retrievedProvider, graphDependencyContext);
-+            T instance = retrievedProvider.createInstance();
-+            if (this.onLoad.load(retrievedProvider, instance)) {
-+                loadedPlugins.add(instance);
++            try {
++                T instance = retrievedProvider.createInstance();
++                if (this.onLoad.load(retrievedProvider, instance)) {
++                    loadedPlugins.add(instance);
++                }
++            } catch (Exception ex) {
++                LOGGER.log(Level.SEVERE, "Could not load plugin '%s' in folder '%s'".formatted(retrievedProvider.getFileName(), retrievedProvider.getParentSource()), ex); // Paper
 +            }
 +        }
 +
@@ -4373,14 +4416,16 @@ index 0000000000000000000000000000000000000000..5d4c05ede5667735f316666eef168052
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..38b5d2367db2400fcbe8092b534dcdcf98f92d99
+index 0000000000000000000000000000000000000000..7053d472711344851b729b7a249823ac0cf75881
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
-@@ -0,0 +1,157 @@
+@@ -0,0 +1,163 @@
 +package io.papermc.paper.plugin.provider.type.spigot;
 +
 +import com.destroystokyo.paper.util.SneakyThrow;
 +import com.destroystokyo.paper.utils.PaperPluginLogger;
++import io.papermc.paper.plugin.DependencyContext;
++import io.papermc.paper.plugin.DependencyContextHolder;
 +import io.papermc.paper.plugin.provider.ProviderStatus;
 +import io.papermc.paper.plugin.provider.ProviderStatusHolder;
 +import io.papermc.paper.plugin.provider.type.JavaPluginProvider;
@@ -4404,7 +4449,7 @@ index 0000000000000000000000000000000000000000..38b5d2367db2400fcbe8092b534dcdcf
 +import java.util.logging.Level;
 +import java.util.logging.Logger;
 +
-+public class SpigotPluginProvider extends JavaPluginProvider implements ProviderStatusHolder {
++public class SpigotPluginProvider extends JavaPluginProvider implements ProviderStatusHolder, DependencyContextHolder {
 +
 +    public static final PluginProviderFactory<SpigotPluginProvider> FACTORY = new SpigotPluginProviderFactory();
 +    private static final LibraryLoader LIBRARY_LOADER = new LibraryLoader(Logger.getLogger("SpigotLibraryLoader"));
@@ -4413,6 +4458,7 @@ index 0000000000000000000000000000000000000000..38b5d2367db2400fcbe8092b534dcdcf
 +    private final JarFile jarFile;
 +    private final Logger logger;
 +    private ProviderStatus status;
++    private DependencyContext dependencyContext;
 +
 +    SpigotPluginProvider(Path path, JarFile file, PluginDescriptionFile description) {
 +        this.path = path;
@@ -4475,9 +4521,7 @@ index 0000000000000000000000000000000000000000..38b5d2367db2400fcbe8092b534dcdcf
 +
 +            Set<String> missingHardDependencies = new HashSet<>(this.description.getDepend().size()); // Paper - list all missing hard depends
 +            for (final String pluginName : this.description.getDepend()) {
-+                Plugin current = server.getPluginManager().getPlugin(pluginName);
-+
-+                if (current == null) {
++                if (!this.dependencyContext.hasDependency(pluginName)) {
 +                    missingHardDependencies.add(pluginName); // Paper - list all missing hard depends
 +                }
 +            }
@@ -4532,6 +4576,11 @@ index 0000000000000000000000000000000000000000..38b5d2367db2400fcbe8092b534dcdcf
 +
 +    public boolean isLegacy() {
 +        return this.description.isLegacy();
++    }
++
++    @Override
++    public void setContext(DependencyContext context) {
++        this.dependencyContext = context;
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProviderFactory.java b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProviderFactory.java
