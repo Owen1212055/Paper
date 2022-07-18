@@ -5,10 +5,10 @@ Subject: [PATCH] Paper Plugins
 
 
 diff --git a/src/main/java/io/papermc/paper/command/PaperCommands.java b/src/main/java/io/papermc/paper/command/PaperCommands.java
-index 37d28625b9528bbe0cd6d9623e702bbbc2b07883..ab9a00b60eed9da7e61feda90a69563a7ae8d05c 100644
+index d31b5ed47cffc61c90c926a0cd2005b72ebddfc5..bbb8b1933ef33a3b91f69545f69dd3cfb84b27f5 100644
 --- a/src/main/java/io/papermc/paper/command/PaperCommands.java
 +++ b/src/main/java/io/papermc/paper/command/PaperCommands.java
-@@ -23,5 +23,6 @@ public final class PaperCommands {
+@@ -24,5 +24,6 @@ public final class PaperCommands {
          COMMANDS.forEach((s, command) -> {
              server.server.getCommandMap().register(s, "Paper", command);
          });
@@ -239,19 +239,6 @@ index 0000000000000000000000000000000000000000..ff90f2e11f9576693fcf93af47ebca83
 +    }
 +
 +}
-diff --git a/src/main/java/io/papermc/paper/configuration/GlobalConfiguration.java b/src/main/java/io/papermc/paper/configuration/GlobalConfiguration.java
-index dbd08c355cf116c8d1d61a81501dadce3749abcb..2b6eac886ec3b3bf70bbd7e50a31742a88fe036a 100644
---- a/src/main/java/io/papermc/paper/configuration/GlobalConfiguration.java
-+++ b/src/main/java/io/papermc/paper/configuration/GlobalConfiguration.java
-@@ -4,7 +4,7 @@ import co.aikar.timings.MinecraftTimings;
- import com.destroystokyo.paper.io.chunk.ChunkTaskManager;
- import io.papermc.paper.configuration.constraint.Constraint;
- import io.papermc.paper.configuration.constraint.Constraints;
--import io.papermc.paper.plugin.provider.service.storage.plugin.strategy.impl.PluginLoadingStrategies;
-+import io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy.PluginLoadingStrategies;
- import net.kyori.adventure.text.Component;
- import net.kyori.adventure.text.format.NamedTextColor;
- import net.minecraft.network.protocol.Packet;
 diff --git a/src/main/java/io/papermc/paper/plugin/DependencyContext.java b/src/main/java/io/papermc/paper/plugin/DependencyContext.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..eb7d3da75c9bfe5fbc19ec4f6f1d44ee6c45335f
@@ -333,14 +320,14 @@ index 0000000000000000000000000000000000000000..244986ff356ebcf19e85dc7b9243e5ca
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrapContextImpl.java b/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrapContextImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..fb8e7c890f3e814157130893a4145ad65af1e86b
+index 0000000000000000000000000000000000000000..cea81ae7c829f940c90f41e0bbb73bb96cdd3602
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrapContextImpl.java
 @@ -0,0 +1,38 @@
 +package io.papermc.paper.plugin.bootstrap;
 +
-+import io.papermc.paper.plugin.provider.PluginProvider;
 +import io.papermc.paper.plugin.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.provider.PluginProvider;
 +import org.jetbrains.annotations.NotNull;
 +
 +import java.nio.file.Path;
@@ -377,15 +364,15 @@ index 0000000000000000000000000000000000000000..fb8e7c890f3e814157130893a4145ad6
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/loader/PaperClasspathBuilder.java b/src/main/java/io/papermc/paper/plugin/loader/PaperClasspathBuilder.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..a22fbf8e483a1a548a8e4711f7b265d0ad72e60e
+index 0000000000000000000000000000000000000000..c2b692047c5a7cf364889ce0cd957bb81b7c2858
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/loader/PaperClasspathBuilder.java
 @@ -0,0 +1,50 @@
 +package io.papermc.paper.plugin.loader;
 +
++import io.papermc.paper.plugin.loader.library.ClassPathLibrary;
 +import io.papermc.paper.plugin.loader.library.PaperLibraryStore;
 +import io.papermc.paper.plugin.provider.PluginProvider;
-+import io.papermc.paper.plugin.loader.library.ClassPathLibrary;
 +import io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoader;
 +import org.jetbrains.annotations.NotNull;
 +
@@ -513,10 +500,10 @@ index 0000000000000000000000000000000000000000..f72dc2655e8bf5bf311d0d05cc147046
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..944b3d1121c033c7de43bc2d3d2edb5f30b87611
+index 0000000000000000000000000000000000000000..df7bff948865f0a3d97e0f8008485979fc01f21b
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
-@@ -0,0 +1,181 @@
+@@ -0,0 +1,179 @@
 +package io.papermc.paper.plugin.manager;
 +
 +import co.aikar.timings.TimedEventExecutor;
@@ -532,8 +519,6 @@ index 0000000000000000000000000000000000000000..944b3d1121c033c7de43bc2d3d2edb5f
 +import java.lang.reflect.Method;
 +import java.util.*;
 +import java.util.logging.Level;
-+import java.util.stream.Collectors;
-+import java.util.stream.Stream;
 +
 +class PaperEventManager {
 +
@@ -646,7 +631,7 @@ index 0000000000000000000000000000000000000000..944b3d1121c033c7de43bc2d3d2edb5f
 +            methods = Sets.union(
 +                Set.of(listenerClazz.getMethods()),
 +                Set.of(listenerClazz.getDeclaredMethods())
-+                );
++            );
 +        } catch (NoClassDefFoundError e) {
 +            plugin.getLogger().severe("Failed to register events for " + listener.getClass() + " because " + e.getMessage() + " does not exist.");
 +            return ret;
@@ -700,7 +685,7 @@ index 0000000000000000000000000000000000000000..944b3d1121c033c7de43bc2d3d2edb5f
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPermissionManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPermissionManager.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..d86164fe8a5cd47eded255591a30e9799a8a8146
+index 0000000000000000000000000000000000000000..de58d2819bbee393cad8121cef0f9a86f93b3c82
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPermissionManager.java
 @@ -0,0 +1,174 @@
@@ -723,8 +708,8 @@ index 0000000000000000000000000000000000000000..d86164fe8a5cd47eded255591a30e979
 +    private final Map<Boolean, Map<Permissible, Boolean>> defSubs = new HashMap<>();
 +
 +    public PaperPermissionManager() {
-+        defaultPerms.put(true, new LinkedHashSet<>());
-+        defaultPerms.put(false, new LinkedHashSet<>());
++        this.defaultPerms.put(true, new LinkedHashSet<>());
++        this.defaultPerms.put(false, new LinkedHashSet<>());
 +    }
 +
 +    @Nullable
@@ -880,7 +865,7 @@ index 0000000000000000000000000000000000000000..d86164fe8a5cd47eded255591a30e979
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..6a7f761b27b25b60d3f653381755dae4c4c4d85e
+index 0000000000000000000000000000000000000000..ece6a4e010987901908e367ca77eb917ac1ab012
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
 @@ -0,0 +1,337 @@
@@ -932,7 +917,7 @@ index 0000000000000000000000000000000000000000..6a7f761b27b25b60d3f653381755dae4
 +    private final CommandMap commandMap;
 +    private final Server server;
 +
-+    private MutableGraph<String> dependencyGraph = GraphBuilder.directed().build();
++    private final MutableGraph<String> dependencyGraph = GraphBuilder.directed().build();
 +
 +    public PaperPluginInstanceManager(PluginManager pluginManager, CommandMap commandMap, Server server) {
 +        this.commandMap = commandMap;
@@ -1541,10 +1526,10 @@ index 0000000000000000000000000000000000000000..3f0a0dadb1061b29b919729f3aea3889
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/ProviderStatus.java b/src/main/java/io/papermc/paper/plugin/provider/ProviderStatus.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..3f29ba87ce732024f08c56347c98fc26bee99837
+index 0000000000000000000000000000000000000000..8eca2be3f446bde0cfc272288bb0b0c6e207c2d8
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/ProviderStatus.java
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,9 @@
 +package io.papermc.paper.plugin.provider;
 +
 +import org.jetbrains.annotations.ApiStatus;
@@ -1553,7 +1538,6 @@ index 0000000000000000000000000000000000000000..3f29ba87ce732024f08c56347c98fc26
 +public enum ProviderStatus {
 +    INITIALIZED,
 +    ERRORED,
-+    ;
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/ProviderStatusHolder.java b/src/main/java/io/papermc/paper/plugin/provider/ProviderStatusHolder.java
 new file mode 100644
@@ -1606,10 +1590,10 @@ index 0000000000000000000000000000000000000000..6ba3bcc468c0a60c76d6d0f0243bda66
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..66c7ae8ba8066730981b36ac2df2288aef7ab8cc
+index 0000000000000000000000000000000000000000..738c089120dac1d46602fdb5cd2d732fa73720a7
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
-@@ -0,0 +1,211 @@
+@@ -0,0 +1,208 @@
 +package io.papermc.paper.plugin.provider.configuration;
 +
 +import com.google.common.collect.ImmutableList;
@@ -1641,39 +1625,39 @@ index 0000000000000000000000000000000000000000..66c7ae8ba8066730981b36ac2df2288a
 +import java.util.List;
 +import java.util.Map;
 +
++@SuppressWarnings({"CanBeFinal", "FieldCanBeLocal", "FieldMayBeFinal", "NotNullFieldNotInitialized", "InnerClassMayBeStatic"})
 +@ConfigSerializable
 +public class PaperPluginConfiguration implements PluginConfiguration {
 +
 +    @PluginConfigConstraints.PluginName
 +    @Required
-+    private String name = null;
++    private String name;
 +    @Required
 +    @PluginConfigConstraints.PluginNameSpace
-+    private String main = null;
++    private String main;
 +    @PluginConfigConstraints.PluginNameSpace
-+    private String bootstrapper = null;
++    private String bootstrapper;
 +    @PluginConfigConstraints.PluginNameSpace
-+    private String loader = null;
++    private String loader;
 +    private List<String> depend = List.of();
 +    private List<String> softDepend = List.of();
 +    private List<String> loadBefore = List.of();
 +    private List<String> provides = List.of();
 +    @Required
-+    private String version = null;
++    private String version;
 +    @FlattenedResolver
 +    private PaperCommandMap commandMap = new PaperCommandMap(Map.of());
-+    private String description = null;
++    private String description;
 +    private List<String> authors = List.of();
 +    private List<String> contributors = List.of();
-+    private String website = null;
-+    private String prefix = null;
++    private String website;
++    private String prefix;
 +    private PluginLoadOrder load = PluginLoadOrder.POSTWORLD;
 +    @FlattenedResolver
 +    private PermissionConfiguration permissionConfiguration = new PermissionConfiguration(PermissionDefault.OP, List.of());
-+
 +    @Required
 +    @PluginConfigConstraints.PluginVersion
-+    private String apiVersion = null;
++    private String apiVersion;
 +
 +    private transient String displayName;
 +
@@ -1689,7 +1673,7 @@ index 0000000000000000000000000000000000000000..66c7ae8ba8066730981b36ac2df2288a
 +                    serializers
 +                        .register(new EnumValueSerializer())
 +                        .register(MapSerializer.TYPE, new MapSerializer(false))
-+                        .register(new TypeToken<List<?>>() {}, new ImmutableListSerializer())
++                        .register(new TypeToken<>() {}, new ImmutableListSerializer())
 +                        .register(PermissionConfiguration.class, PermissionConfigurationSerializer.SERIALIZER)
 +                        .register(new ComponentSerializer())
 +                        .registerAnnotatedObjects(
@@ -1719,9 +1703,6 @@ index 0000000000000000000000000000000000000000..66c7ae8ba8066730981b36ac2df2288a
 +        pluginConfiguration.displayName = pluginConfiguration.name.replace('_', ' ');
 +
 +        return pluginConfiguration;
-+    }
-+
-+    public PaperPluginConfiguration() {
 +    }
 +
 +    @Override
@@ -1823,7 +1804,7 @@ index 0000000000000000000000000000000000000000..66c7ae8ba8066730981b36ac2df2288a
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableCollectionSerializer.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableCollectionSerializer.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..b47064eafe4f9445baa09e74f4c89804a34187f4
+index 0000000000000000000000000000000000000000..f0cdb1bab30faaa438aa3e6de6125ade3fae98c2
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableCollectionSerializer.java
 @@ -0,0 +1,90 @@
@@ -1859,11 +1840,11 @@ index 0000000000000000000000000000000000000000..b47064eafe4f9445baa09e74f4c89804
 +        if (node.isList()) {
 +            final List<? extends ConfigurationNode> values = node.childrenList();
 +            final B builder = this.createNew(values.size());
-+            for (int i = 0; i < values.size(); ++i) {
++            for (ConfigurationNode value : values) {
 +                try {
-+                    this.deserializeSingle(i, builder, entrySerial.deserialize(entryType, values.get(i)));
++                    this.deserializeSingle(builder, entrySerial.deserialize(entryType, value));
 +                } catch (final SerializationException ex) {
-+                    ex.initPath(values.get(i)::path);
++                    ex.initPath(value::path);
 +                    throw ex;
 +                }
 +            }
@@ -1872,7 +1853,7 @@ index 0000000000000000000000000000000000000000..b47064eafe4f9445baa09e74f4c89804
 +            final @Nullable Object unwrappedVal = node.raw();
 +            if (unwrappedVal != null) {
 +                final B builder = this.createNew(1);
-+                this.deserializeSingle(0, builder, entrySerial.deserialize(entryType, node));
++                this.deserializeSingle(builder, entrySerial.deserialize(entryType, node));
 +                return (T) builder.build();
 +            }
 +        }
@@ -1914,12 +1895,12 @@ index 0000000000000000000000000000000000000000..b47064eafe4f9445baa09e74f4c89804
 +
 +    protected abstract void forEachElement(T collection, CheckedConsumer<Object, SerializationException> action) throws SerializationException;
 +
-+    protected abstract void deserializeSingle(int index, B builder, @Nullable Object deserialized) throws SerializationException;
++    protected abstract void deserializeSingle(B builder, @Nullable Object deserialized) throws SerializationException;
 +
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableListSerializer.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableListSerializer.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0742f9bb757708c30f64ab0887c53543750830da
+index 0000000000000000000000000000000000000000..7757d7df70e39a6fe4d92d02b6f905a22f80dbf3
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/ImmutableListSerializer.java
 @@ -0,0 +1,43 @@
@@ -1958,7 +1939,7 @@ index 0000000000000000000000000000000000000000..0742f9bb757708c30f64ab0887c53543
 +
 +    @SuppressWarnings({"unchecked", "rawtypes"})
 +    @Override
-+    protected void deserializeSingle(int index, ImmutableList.Builder<?> builder, @Nullable Object deserialized) throws SerializationException {
++    protected void deserializeSingle(ImmutableList.Builder<?> builder, @Nullable Object deserialized) throws SerializationException {
 +        if (deserialized == null) {
 +            return;
 +        }
@@ -2030,7 +2011,7 @@ index 0000000000000000000000000000000000000000..d1088e4b7fa5f8e689f23b150b83645c
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/constraints/PluginConfigConstraints.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/constraints/PluginConfigConstraints.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..c42f09edf6898483f0cedda68006d0ae2bfe99f3
+index 0000000000000000000000000000000000000000..52451beed5ea8463bcabdd1289d64df5aa0f4deb
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/serializer/constraints/PluginConfigConstraints.java
 @@ -0,0 +1,82 @@
@@ -2058,7 +2039,7 @@ index 0000000000000000000000000000000000000000..c42f09edf6898483f0cedda68006d0ae
 +
 +        final class Factory implements Constraint.Factory<PluginName, String> {
 +
-+            private static final Pattern VALID_NAME = Pattern.compile("^[A-Za-z0-9 _.-]+$");
++            private static final Pattern VALID_NAME = Pattern.compile("^[A-Za-z\\d _.-]+$");
 +
 +            @Override
 +            public Constraint<String> make(PluginName data, Type type) {
@@ -2140,10 +2121,10 @@ index 0000000000000000000000000000000000000000..824f32258c2cc6a2908eca573fa14ea6
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PaperCommandMap.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PaperCommandMap.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..f00fa0e630687b58fbb783b3fb0231102012878a
+index 0000000000000000000000000000000000000000..19caf0f21fce960736c467bdf975558168b18696
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/type/PaperCommandMap.java
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,20 @@
 +package io.papermc.paper.plugin.provider.configuration.type;
 +
 +import org.spongepowered.configurate.objectmapping.ConfigSerializable;
@@ -2153,10 +2134,7 @@ index 0000000000000000000000000000000000000000..f00fa0e630687b58fbb783b3fb023110
 +@ConfigSerializable
 +public class PaperCommandMap {
 +
-+    private Map<String, PaperCommand> commands;
-+
-+    public PaperCommandMap() {
-+    }
++    private final Map<String, PaperCommand> commands;
 +
 +    public PaperCommandMap(Map<String, PaperCommand> commands) {
 +        this.commands = commands;
@@ -2212,18 +2190,16 @@ index 0000000000000000000000000000000000000000..9cfac374ac7288b458f01abb77ddf68e
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..7022ab9038620a97c0c35a2027d90b1d4f38b5f8
+index 0000000000000000000000000000000000000000..c14201fd42bd1ffa5ae68dbd4184e55a83183638
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,161 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
 +import io.papermc.paper.plugin.DependencyContext;
 +import io.papermc.paper.plugin.DependencyContextHolder;
 +import io.papermc.paper.plugin.configuration.PluginConfiguration;
 +import org.bukkit.Bukkit;
-+import org.bukkit.configuration.serialization.ConfigurationSerializable;
-+import org.bukkit.configuration.serialization.ConfigurationSerialization;
 +import org.bukkit.plugin.PluginDescriptionFile;
 +import org.bukkit.plugin.java.JavaPlugin;
 +import org.jetbrains.annotations.NotNull;
@@ -2239,24 +2215,20 @@ index 0000000000000000000000000000000000000000..7022ab9038620a97c0c35a2027d90b1d
 +
 +public class PaperPluginClassLoader extends PaperSimplePluginClassLoader implements ConfiguredPluginClassLoader, DependencyContextHolder {
 +
++    static {
++        registerAsParallelCapable();
++    }
++
 +    private final PaperPluginClassLoaderStorage loader;
 +    private final ClassLoader libraryLoader;
-+
-+    private final Map<String, Class<?>> loadedClasses = new ConcurrentHashMap<>();
-+
 +    private final Set<String> seenIllegalAccess = Collections.newSetFromMap(new ConcurrentHashMap<>());
 +    private final Logger logger;
-+
 +    /*
 +    We have to hackily store the dependency context here as we have to places
 +    that we need to account for dependencies at.
 +    We cannot be certain that the dependencies will be loaded the same in both places.
 +     */
 +    private DependencyContext dependencyContext;
-+
-+    static {
-+        registerAsParallelCapable();
-+    }
 +
 +    public PaperPluginClassLoader(Logger logger, Path source, JarFile file, PluginConfiguration configuration, ClassLoader parentLoader, ClassLoader libraryLoader) throws IOException {
 +        super(source, file, configuration, parentLoader);
@@ -2365,43 +2337,10 @@ index 0000000000000000000000000000000000000000..7022ab9038620a97c0c35a2027d90b1d
 +    }
 +
 +    @Override
-+    protected Class<?> findClass(String name) throws ClassNotFoundException {
-+        Class<?> clazz = super.findClass(name);
-+        this.setClass(clazz);
-+
-+        return clazz;
-+    }
-+
-+    @Override
-+    public void close() throws IOException {
-+        for (Class<?> clazz : this.loadedClasses.values()) {
-+            this.removeClass(clazz);
-+        }
-+
-+        super.close();
-+    }
-+
-+    // TODO: are we supporting this cringe?
-+    private void setClass(@NotNull final Class<?> clazz) {
-+        if (ConfigurationSerializable.class.isAssignableFrom(clazz)) {
-+            Class<? extends ConfigurationSerializable> serializable = clazz.asSubclass(ConfigurationSerializable.class);
-+            ConfigurationSerialization.registerClass(serializable);
-+        }
-+    }
-+
-+    private void removeClass(@NotNull Class<?> clazz) {
-+        if (ConfigurationSerializable.class.isAssignableFrom(clazz)) {
-+            Class<? extends ConfigurationSerializable> serializable = clazz.asSubclass(ConfigurationSerializable.class);
-+            ConfigurationSerialization.unregisterClass(serializable);
-+        }
-+    }
-+
-+    @Override
 +    public String toString() {
 +        return "PaperPluginClassLoader{" +
 +            "loader=" + this.loader +
 +            ", libraryLoader=" + this.libraryLoader +
-+            ", loadedClasses=" + this.loadedClasses +
 +            ", seenIllegalAccess=" + this.seenIllegalAccess +
 +            ", configuration=" + this.configuration +
 +            ", source=" + this.source +
@@ -2418,10 +2357,10 @@ index 0000000000000000000000000000000000000000..7022ab9038620a97c0c35a2027d90b1d
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..3c0a3ff7d3bcb244bfede6af189ab0055dda30de
+index 0000000000000000000000000000000000000000..180d52ce6cdd55540c5f86cbb5f67887a85d93e6
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,117 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
 +import io.papermc.paper.plugin.configuration.PluginConfiguration;
@@ -2448,18 +2387,15 @@ index 0000000000000000000000000000000000000000..3c0a3ff7d3bcb244bfede6af189ab005
 +@ApiStatus.Internal
 +public class PaperSimplePluginClassLoader extends URLClassLoader {
 +
-+    protected final PluginConfiguration configuration;
-+
-+    protected final Path source;
-+
-+    protected final Manifest jarManifest;
-+    protected final URL jarUrl;
-+
-+    protected final JarFile jar;
-+
 +    static {
 +        ClassLoader.registerAsParallelCapable();
 +    }
++
++    protected final PluginConfiguration configuration;
++    protected final Path source;
++    protected final Manifest jarManifest;
++    protected final URL jarUrl;
++    protected final JarFile jar;
 +
 +    public PaperSimplePluginClassLoader(Path source, JarFile file, PluginConfiguration configuration, ClassLoader parentLoader) throws IOException {
 +        super(source.getFileName().toString(), new URL[]{source.toUri().toURL()}, parentLoader);
@@ -2538,22 +2474,9 @@ index 0000000000000000000000000000000000000000..3c0a3ff7d3bcb244bfede6af189ab005
 +            ", source=" + this.source +
 +            ", jarManifest=" + this.jarManifest +
 +            ", jarUrl=" + this.jarUrl +
-+            ", jar=" +this. jar +
++            ", jar=" + this.jar +
 +            '}';
 +    }
-+}
-diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PluginClassloader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PluginClassloader.java
-new file mode 100644
-index 0000000000000000000000000000000000000000..f059030ab0fc2dc2327b5d1f874c7a098ab6b30e
---- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PluginClassloader.java
-@@ -0,0 +1,7 @@
-+package io.papermc.paper.plugin.provider.service.classloader;
-+
-+import org.jetbrains.annotations.ApiStatus;
-+
-+@ApiStatus.Internal
-+public interface PluginClassloader {
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/Entrypoint.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/Entrypoint.java
 new file mode 100644
@@ -2646,16 +2569,17 @@ index 0000000000000000000000000000000000000000..b8616cb2537dc3e27d3dee008f8a5083
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..bed4888a7a31bd3030cd19d3cd6393e2a1ba231d
+index 0000000000000000000000000000000000000000..20395788fb71f7876336a0c07a307bc38bc9259e
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ProviderStorage.java
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,18 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint.storage;
 +
 +import io.papermc.paper.plugin.provider.PluginProvider;
 +
 +/**
 + * A provider storage is meant to be a singleton that stores providers.
++ *
 + * @param <T> provider type
 + */
 +public interface ProviderStorage<T> {
@@ -2700,10 +2624,10 @@ index 0000000000000000000000000000000000000000..6ba8daac385844a2af4ab861f60837f2
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/BootstrapProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/BootstrapProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..9c8ada5adb4682b82ac03108dfd51d36a77b678b
+index 0000000000000000000000000000000000000000..6a30e697c3391b9cef814f33e5eb3f7502727df1
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/BootstrapProviderStorage.java
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,76 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered;
 +
 +import io.papermc.paper.plugin.DependencyContext;
@@ -2770,34 +2694,30 @@ index 0000000000000000000000000000000000000000..9c8ada5adb4682b82ac03108dfd51d36
 +        }
 +
 +        LOGGER.log(Level.SEVERE, "Circular dependencies detected!");
-+        LOGGER.log(Level.SEVERE, "You have a plugin that is depending on a plugin which refers back to that plugin. Your server will shut down until these are resolved");
++        LOGGER.log(Level.SEVERE, "You have a plugin that is depending on a plugin which refers back to that plugin. Your server will shut down until these are resolved, or the strategy is changed.");
 +        LOGGER.log(Level.SEVERE, "Circular dependencies:");
 +        for (String message : logMessages) {
 +            LOGGER.log(Level.SEVERE, message);
 +        }
-+        // Technically, they can. Should we support this?
-+        LOGGER.log(Level.SEVERE, "You MUST contact the author to resolve this or to remove the specified plugin. Bootstrappers cannot use the legacy loading order.");
++        LOGGER.log(Level.SEVERE, "If you would like to still load these plugins, acknowledging that there may be unexpected plugin loading issues, change plugin-loading-strategy in paper-global.yml to LEGACY.");
 +
 +        System.exit(-1);
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ConfiguredOrderedProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ConfiguredOrderedProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..cc020396281a319ace77ad594268bdcb7fe59682
+index 0000000000000000000000000000000000000000..03eb5251325eaeb61410cabae8341e31c9db4412
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ConfiguredOrderedProviderStorage.java
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,41 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered;
 +
-+import io.papermc.paper.configuration.GlobalConfiguration;
-+import io.papermc.paper.plugin.provider.PluginProvider;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy.LegacyPluginLoadingStrategy;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy.ModernPluginLoadingStrategy;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy.PluginGraphCycleException;
 +
 +import java.util.ArrayList;
 +import java.util.List;
-+import java.util.function.BiConsumer;
 +import java.util.logging.Level;
 +import java.util.logging.Logger;
 +
@@ -2808,10 +2728,7 @@ index 0000000000000000000000000000000000000000..cc020396281a319ace77ad594268bdcb
 +    // This doesn't work with reloading.
 +    // Should we care?
 +    public ConfiguredOrderedProviderStorage(ProviderLoader<T> onLoad) {
-+        super(switch (GlobalConfiguration.get().misc.pluginLoadingStrategy) {
-+            case MODERN -> new ModernPluginLoadingStrategy<>(onLoad);
-+            case LEGACY -> new LegacyPluginLoadingStrategy<>(onLoad);
-+        });
++        super(Boolean.getBoolean("paper.useLegacyPluginLoading") ? new ModernPluginLoadingStrategy<>(onLoad) : new LegacyPluginLoadingStrategy<>(onLoad));
 +    }
 +
 +    @Override
@@ -2828,7 +2745,7 @@ index 0000000000000000000000000000000000000000..cc020396281a319ace77ad594268bdcb
 +        for (String message : logMessages) {
 +            LOGGER.log(Level.SEVERE, message);
 +        }
-+        LOGGER.log(Level.SEVERE, "If you would like to still load these plugins, acknowledging that there may be unexpected plugin loading issues, change plugin-loading-strategy in paper-global.yml to LEGACY.");
++        LOGGER.log(Level.SEVERE, "If you would like to still load these plugins, acknowledging that there may be unexpected plugin loading issues, run the server with -Dpaper.useLegacyPluginLoading=true");
 +
 +        System.exit(-1);
 +    }
@@ -2836,7 +2753,7 @@ index 0000000000000000000000000000000000000000..cc020396281a319ace77ad594268bdcb
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/OrderedProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/OrderedProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..3d930396dec057726a85be0b7a285d20dd68bf22
+index 0000000000000000000000000000000000000000..5c53e096cfe72682ea0aeb58c39261028678cecd
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/OrderedProviderStorage.java
 @@ -0,0 +1,40 @@
@@ -2844,8 +2761,8 @@ index 0000000000000000000000000000000000000000..3d930396dec057726a85be0b7a285d20
 +
 +import io.papermc.paper.plugin.provider.PluginProvider;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.SimpleProviderStorage;
-+import io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy.ProviderLoadingStrategy;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy.PluginGraphCycleException;
++import io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy.ProviderLoadingStrategy;
 +
 +import java.util.ArrayList;
 +import java.util.List;
@@ -2900,7 +2817,7 @@ index 0000000000000000000000000000000000000000..2ddb96543ec54e7b0a1fd21bdec092bd
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ServerPluginProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ServerPluginProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..cdb308b175975d297d37a955ae8fbc2c6516c913
+index 0000000000000000000000000000000000000000..6af27da28317e3597a0ba1fe186d9b94c7c28fd0
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ServerPluginProviderStorage.java
 @@ -0,0 +1,122 @@
@@ -2958,6 +2875,38 @@ index 0000000000000000000000000000000000000000..cdb308b175975d297d37a955ae8fbc2c
 +        });
 +    }
 +
++    public static void setupJavaplugin(JavaPlugin plugin) {
++        if (plugin.getConfiguration() instanceof PaperPluginConfiguration paperPluginConfiguration) {
++            PaperCommandMap commandMap = paperPluginConfiguration.getCommandMap();
++
++            for (Map.Entry<String, PaperCommand> entry : commandMap.getCommands().entrySet()) {
++                Command newCmd = new PluginCommand(entry.getKey(), plugin);
++
++                PaperCommand command = entry.getValue();
++
++                String description = command.description();
++                if (description != null) {
++                    newCmd.setDescription(description);
++                }
++                String usage = command.usage();
++                if (usage != null) {
++                    newCmd.setUsage(usage);
++                }
++                String permission = command.permission();
++                if (permission != null) {
++                    newCmd.setPermission(permission);
++                }
++
++                newCmd.setAliases(command.aliases());
++                newCmd.permissionMessage(command.permissionMessage());
++
++                Bukkit.getCommandMap().register(paperPluginConfiguration.getIdentifier(), newCmd);
++            }
++        }
++
++        ((PaperPluginManagerImpl) Bukkit.getPluginManager()).loadPlugin(plugin);
++    }
++
 +    @Override
 +    public void processProvided(JavaPlugin provided) {
 +        setupJavaplugin(provided);
@@ -2992,38 +2941,6 @@ index 0000000000000000000000000000000000000000..cdb308b175975d297d37a955ae8fbc2c
 +        LOGGER.log(Level.SEVERE, "If you would like to still load these plugins, acknowledging that there may be unexpected plugin loading issues, change plugin-loading-strategy in paper-global.yml to LEGACY.");
 +
 +        System.exit(-1);
-+    }
-+
-+    public static void setupJavaplugin(JavaPlugin plugin) {
-+        if (plugin.getConfiguration() instanceof PaperPluginConfiguration paperPluginConfiguration) {
-+            PaperCommandMap commandMap = paperPluginConfiguration.getCommandMap();
-+
-+            for (Map.Entry<String, PaperCommand> entry : commandMap.getCommands().entrySet()) {
-+                Command newCmd = new PluginCommand(entry.getKey(), plugin);
-+
-+                PaperCommand command = entry.getValue();
-+
-+                String description = command.description();
-+                if (description != null) {
-+                    newCmd.setDescription(description);
-+                }
-+                String usage = command.usage();
-+                if (usage != null) {
-+                    newCmd.setUsage(usage);
-+                }
-+                String permission = command.permission();
-+                if (permission != null) {
-+                    newCmd.setPermission(permission);
-+                }
-+
-+                newCmd.setAliases(command.aliases());
-+                newCmd.permissionMessage(command.permissionMessage());
-+
-+                Bukkit.getCommandMap().register(paperPluginConfiguration.getIdentifier(), newCmd);
-+            }
-+        }
-+
-+        ((PaperPluginManagerImpl) Bukkit.getPluginManager()).loadPlugin(plugin);
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/GraphCycleException.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/GraphCycleException.java
@@ -3389,17 +3306,17 @@ index 0000000000000000000000000000000000000000..fb9f96a018d32dfe8ec9df16ee833bf6
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/LegacyPluginLoadingStrategy.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/LegacyPluginLoadingStrategy.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0e14df705c61b8d13b3783fb6558b8022ac507da
+index 0000000000000000000000000000000000000000..b38b4cf226181afd750da3f3a843061c76d0bf1e
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/LegacyPluginLoadingStrategy.java
-@@ -0,0 +1,254 @@
+@@ -0,0 +1,253 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy;
 +
 +import com.google.common.graph.GraphBuilder;
 +import com.google.common.graph.MutableGraph;
 +import io.papermc.paper.plugin.GraphDependencyContext;
-+import io.papermc.paper.plugin.provider.PluginProvider;
 +import io.papermc.paper.plugin.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.provider.PluginProvider;
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.ProviderLoader;
 +import org.bukkit.plugin.UnknownDependencyException;
 +
@@ -3592,7 +3509,6 @@ index 0000000000000000000000000000000000000000..0e14df705c61b8d13b3783fb6558b802
 +                            javapluginsLoaded.add(loadedPlugin);
 +                        }
 +
-+                        continue;
 +                    } catch (Exception ex) {
 +                        LOGGER.log(Level.SEVERE, "Could not load '" + file.getSource() + "' in folder '" + file.getParentSource() + "'", ex); // Paper
 +                    }
@@ -3792,19 +3708,9 @@ index 0000000000000000000000000000000000000000..05eb118f102d6c9a1b20d30bd4c41b6c
 +        return this.cycles;
 +    }
 +}
-diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/PluginLoadingStrategies.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/PluginLoadingStrategies.java
-similarity index 81%
-rename from src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/PluginLoadingStrategies.java
-rename to src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/PluginLoadingStrategies.java
-index 04db26520c87173e7bcc2d8408eec8ea7769eaa9..c1900293382215c5495df348c54f45ececf9d0c9 100644
---- a/src/main/java/io/papermc/paper/plugin/provider/service/storage/plugin/strategy/impl/PluginLoadingStrategies.java
-+++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/PluginLoadingStrategies.java
-@@ -1,4 +1,4 @@
--package io.papermc.paper.plugin.provider.service.storage.plugin.strategy.impl;
-+package io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy;
- 
- public enum PluginLoadingStrategies {
- 
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/PluginLoadingStrategies.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/PluginLoadingStrategies.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/ProviderLoadingStrategy.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/ProviderLoadingStrategy.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..5c2453957177688d26ddbf2ff36e3de4ac277ba1
@@ -3895,7 +3801,7 @@ index 0000000000000000000000000000000000000000..50c8ae5dfccdd7698a1454034259d622
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/source/Providers.java b/src/main/java/io/papermc/paper/plugin/provider/source/Providers.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..3787e12c0d771946528f3dd8987cbe3a6812fc13
+index 0000000000000000000000000000000000000000..cec2a03a0354c9237508920e1d3f4f8b16d4ddce
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/source/Providers.java
 @@ -0,0 +1,24 @@
@@ -3911,8 +3817,8 @@ index 0000000000000000000000000000000000000000..3787e12c0d771946528f3dd8987cbe3a
 + */
 +public class Providers {
 +
-+    private static final Logger LOGGER = Logger.getLogger("PluginLoading"); // Name for easier understanding
 +    public static final Providers INSTANCE = new Providers();
++    private static final Logger LOGGER = Logger.getLogger("PluginLoading"); // Name for easier understanding
 +
 +    public <C> void addProviders(ProviderSource<C> source, C context) {
 +        try {
@@ -3925,10 +3831,10 @@ index 0000000000000000000000000000000000000000..3787e12c0d771946528f3dd8987cbe3a
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/source/impl/DirectoryProviderSource.java b/src/main/java/io/papermc/paper/plugin/provider/source/impl/DirectoryProviderSource.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..1af850818ec465449886ba575e9f5ae755f2b807
+index 0000000000000000000000000000000000000000..b07379af27b53cd9ab0e9db1e444d2dd64057dda
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/source/impl/DirectoryProviderSource.java
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,34 @@
 +package io.papermc.paper.plugin.provider.source.impl;
 +
 +import io.papermc.paper.plugin.provider.service.entrypoint.EntrypointHandler;
@@ -3941,9 +3847,8 @@ index 0000000000000000000000000000000000000000..1af850818ec465449886ba575e9f5ae7
 +
 +public class DirectoryProviderSource implements ProviderSource<Path> {
 +
-+    private static final Logger LOGGER = Logger.getLogger("DirectoryProviderSource");
 +    public static final DirectoryProviderSource INSTANCE = new DirectoryProviderSource();
-+
++    private static final Logger LOGGER = Logger.getLogger("DirectoryProviderSource");
 +    private final FileProviderSource providerSource = new FileProviderSource(false);
 +
 +    @Override
@@ -4020,10 +3925,10 @@ index 0000000000000000000000000000000000000000..02b98fd9895cce0cd68113937c3c0d9d
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/source/impl/PluginFlagProviderSource.java b/src/main/java/io/papermc/paper/plugin/provider/source/impl/PluginFlagProviderSource.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..906dc9d5de688131c636d61dd6711084f73984b9
+index 0000000000000000000000000000000000000000..fc95f3e850b23b70e04f2fe8138868ce018dcd2e
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/source/impl/PluginFlagProviderSource.java
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,27 @@
 +package io.papermc.paper.plugin.provider.source.impl;
 +
 +import io.papermc.paper.plugin.provider.service.entrypoint.EntrypointHandler;
@@ -4036,9 +3941,8 @@ index 0000000000000000000000000000000000000000..906dc9d5de688131c636d61dd6711084
 +
 +public class PluginFlagProviderSource implements ProviderSource<List<File>> {
 +
-+    private static final Logger LOGGER = Logger.getLogger("PluginFlagProviderSource");
 +    public static final PluginFlagProviderSource INSTANCE = new PluginFlagProviderSource();
-+
++    private static final Logger LOGGER = Logger.getLogger("PluginFlagProviderSource");
 +    private final FileProviderSource providerSource = new FileProviderSource(true);
 +
 +    @Override
@@ -4067,7 +3971,7 @@ index 0000000000000000000000000000000000000000..c7b16e25a140e51ef4dfbba3d036acf6
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java b/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..16c0899c2cfc5ea4f2183b3b2ca01ccfbcd7d655
+index 0000000000000000000000000000000000000000..069fcbe0ab83f6fbb04c752344a5b6377baded44
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java
 @@ -0,0 +1,68 @@
@@ -4119,14 +4023,6 @@ index 0000000000000000000000000000000000000000..16c0899c2cfc5ea4f2183b3b2ca01ccf
 +        this.factory = factory;
 +    }
 +
-+    public T register(EntrypointHandler entrypointHandler, JarFile file, Path context) throws Exception {
-+        T provider = this.factory.build(file, file.getJarEntry(this.config), context);
-+        this.register(entrypointHandler, provider);
-+        return provider;
-+    }
-+
-+    protected abstract void register(EntrypointHandler entrypointHandler, T provider);
-+
 +    @Nullable
 +    public static PluginFileType<?> guessType(JarFile file) {
 +        for (PluginFileType<?> type : VALUES) {
@@ -4138,6 +4034,14 @@ index 0000000000000000000000000000000000000000..16c0899c2cfc5ea4f2183b3b2ca01ccf
 +
 +        return null;
 +    }
++
++    public T register(EntrypointHandler entrypointHandler, JarFile file, Path context) throws Exception {
++        T provider = this.factory.build(file, file.getJarEntry(this.config), context);
++        this.register(entrypointHandler, provider);
++        return provider;
++    }
++
++    protected abstract void register(EntrypointHandler entrypointHandler, T provider);
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/PluginProviderFactory.java b/src/main/java/io/papermc/paper/plugin/provider/type/PluginProviderFactory.java
 new file mode 100644
@@ -4159,10 +4063,10 @@ index 0000000000000000000000000000000000000000..ab31b1c635f91c51b4740492817e4387
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperParentProvider.java b/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperParentProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..4238d2c901ee1961da835c1dd76923fe43105afe
+index 0000000000000000000000000000000000000000..9f10323220ea3147f7bfd006b7ce6879b74d3174
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperParentProvider.java
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,74 @@
 +package io.papermc.paper.plugin.provider.type.paper;
 +
 +import com.destroystokyo.paper.utils.PaperPluginLogger;
@@ -4226,6 +4130,7 @@ index 0000000000000000000000000000000000000000..4238d2c901ee1961da835c1dd76923fe
 +        return new PaperPluginProvider(this.path, this.jarFile, this.description, builder.buildClassLoader(this), this.logger);
 +    }
 +
++    @Override
 +    public PaperPluginConfiguration getConfiguration() {
 +        return this.description;
 +    }
@@ -4238,7 +4143,7 @@ index 0000000000000000000000000000000000000000..4238d2c901ee1961da835c1dd76923fe
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..87841861fa725c6a38db27ebdca360daefd85c23
+index 0000000000000000000000000000000000000000..cec566ba2fdba57a24c2ad245107a8d14da7f9e0
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProvider.java
 @@ -0,0 +1,195 @@
@@ -4288,6 +4193,14 @@ index 0000000000000000000000000000000000000000..87841861fa725c6a38db27ebdca360da
 +
 +    public PaperBootstrapProvider createBootstrapProvider() {
 +        return new PaperBootstrapProvider();
++    }
++
++    public PaperServerPluginProvider createPluginProvider() {
++        return new PaperServerPluginProvider(null);
++    }
++
++    public PaperServerPluginProvider createPluginProvider(PaperBootstrapProvider provider) {
++        return new PaperServerPluginProvider(provider);
 +    }
 +
 +    public class PaperBootstrapProvider implements PluginProvider<PluginBootstrap>, ProviderStatusHolder, DependencyContextHolder {
@@ -4342,14 +4255,6 @@ index 0000000000000000000000000000000000000000..87841861fa725c6a38db27ebdca360da
 +        public void setContext(DependencyContext context) {
 +            PaperPluginProvider.this.classLoader.setContext(context);
 +        }
-+    }
-+
-+    public PaperServerPluginProvider createPluginProvider() {
-+        return new PaperServerPluginProvider(null);
-+    }
-+
-+    public PaperServerPluginProvider createPluginProvider(PaperBootstrapProvider provider) {
-+        return new PaperServerPluginProvider(provider);
 +    }
 +
 +    public class PaperServerPluginProvider extends JavaPluginProvider implements ProviderStatusHolder, DependencyContextHolder {
@@ -4439,19 +4344,16 @@ index 0000000000000000000000000000000000000000..87841861fa725c6a38db27ebdca360da
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProviderFactory.java b/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProviderFactory.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..9e06935a3141b22cf1fe6b199dda1d0fc16b24e9
+index 0000000000000000000000000000000000000000..5d4c05ede5667735f316666eef1680525502163f
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/paper/PaperPluginProviderFactory.java
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,23 @@
 +package io.papermc.paper.plugin.provider.type.paper;
 +
 +import io.papermc.paper.plugin.provider.configuration.PaperPluginConfiguration;
 +import io.papermc.paper.plugin.provider.type.PluginProviderFactory;
-+import org.bukkit.plugin.InvalidDescriptionException;
-+import org.yaml.snakeyaml.error.YAMLException;
 +
 +import java.io.BufferedReader;
-+import java.io.IOException;
 +import java.io.InputStreamReader;
 +import java.nio.file.Path;
 +import java.util.jar.JarEntry;
@@ -4471,10 +4373,10 @@ index 0000000000000000000000000000000000000000..9e06935a3141b22cf1fe6b199dda1d0f
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..82b4dd444610ffd57e253a479d4b435d513e4bf2
+index 0000000000000000000000000000000000000000..38b5d2367db2400fcbe8092b534dcdcf98f92d99
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
-@@ -0,0 +1,159 @@
+@@ -0,0 +1,157 @@
 +package io.papermc.paper.plugin.provider.type.spigot;
 +
 +import com.destroystokyo.paper.util.SneakyThrow;
@@ -4485,9 +4387,11 @@ index 0000000000000000000000000000000000000000..82b4dd444610ffd57e253a479d4b435d
 +import io.papermc.paper.plugin.provider.type.PluginProviderFactory;
 +import org.bukkit.Bukkit;
 +import org.bukkit.Server;
-+import org.bukkit.plugin.*;
++import org.bukkit.plugin.InvalidPluginException;
++import org.bukkit.plugin.Plugin;
++import org.bukkit.plugin.PluginDescriptionFile;
++import org.bukkit.plugin.UnknownDependencyException;
 +import org.bukkit.plugin.java.JavaPlugin;
-+import org.bukkit.plugin.java.JavaPluginLoader;
 +import org.bukkit.plugin.java.LibraryLoader;
 +import org.bukkit.plugin.java.PluginClassLoader;
 +import org.jetbrains.annotations.NotNull;
@@ -4504,14 +4408,11 @@ index 0000000000000000000000000000000000000000..82b4dd444610ffd57e253a479d4b435d
 +
 +    public static final PluginProviderFactory<SpigotPluginProvider> FACTORY = new SpigotPluginProviderFactory();
 +    private static final LibraryLoader LIBRARY_LOADER = new LibraryLoader(Logger.getLogger("SpigotLibraryLoader"));
-+
-+    private ProviderStatus status;
-+
 +    private final Path path;
 +    private final PluginDescriptionFile description;
 +    private final JarFile jarFile;
-+
 +    private final Logger logger;
++    private ProviderStatus status;
 +
 +    SpigotPluginProvider(Path path, JarFile file, PluginDescriptionFile description) {
 +        this.path = path;
@@ -4536,9 +4437,8 @@ index 0000000000000000000000000000000000000000..82b4dd444610ffd57e253a479d4b435d
 +        try {
 +
 +            final File parentFile = server.getPluginsFolder(); // Paper
-+            final File dataFolder = new File(parentFile, description.getName());
-+            @SuppressWarnings("deprecation")
-+            final File oldDataFolder = new File(parentFile, description.getRawName());
++            final File dataFolder = new File(parentFile, this.description.getName());
++            @SuppressWarnings("deprecation") final File oldDataFolder = new File(parentFile, this.description.getRawName());
 +
 +            // Found old data folder
 +            if (dataFolder.equals(oldDataFolder)) {
@@ -4546,8 +4446,8 @@ index 0000000000000000000000000000000000000000..82b4dd444610ffd57e253a479d4b435d
 +            } else if (dataFolder.isDirectory() && oldDataFolder.isDirectory()) {
 +                server.getLogger().warning(String.format(
 +                    "While loading %s (%s) found old-data folder: `%s' next to the new one `%s'",
-+                    description.getFullName(),
-+                    path,
++                    this.description.getFullName(),
++                    this.path,
 +                    oldDataFolder,
 +                    dataFolder
 +                ));
@@ -4557,8 +4457,8 @@ index 0000000000000000000000000000000000000000..82b4dd444610ffd57e253a479d4b435d
 +                }
 +                server.getLogger().log(Level.INFO, String.format(
 +                    "While loading %s (%s) renamed data folder: `%s' to `%s'",
-+                    description.getFullName(),
-+                    path,
++                    this.description.getFullName(),
++                    this.path,
 +                    oldDataFolder,
 +                    dataFolder
 +                ));
@@ -4568,13 +4468,13 @@ index 0000000000000000000000000000000000000000..82b4dd444610ffd57e253a479d4b435d
 +                throw new InvalidPluginException(String.format(
 +                    "Projected datafolder: `%s' for %s (%s) exists and is not a directory",
 +                    dataFolder,
-+                    description.getFullName(),
-+                    path
++                    this.description.getFullName(),
++                    this.path
 +                ));
 +            }
 +
-+            Set<String> missingHardDependencies = new HashSet<>(description.getDepend().size()); // Paper - list all missing hard depends
-+            for (final String pluginName : description.getDepend()) {
++            Set<String> missingHardDependencies = new HashSet<>(this.description.getDepend().size()); // Paper - list all missing hard depends
++            for (final String pluginName : this.description.getDepend()) {
 +                Plugin current = server.getPluginManager().getPlugin(pluginName);
 +
 +                if (current == null) {
@@ -4583,15 +4483,15 @@ index 0000000000000000000000000000000000000000..82b4dd444610ffd57e253a479d4b435d
 +            }
 +            // Paper start - list all missing hard depends
 +            if (!missingHardDependencies.isEmpty()) {
-+                throw new UnknownDependencyException(missingHardDependencies, description.getFullName());
++                throw new UnknownDependencyException(missingHardDependencies, this.description.getFullName());
 +            }
 +            // Paper end
 +
-+            server.getUnsafe().checkSupported(description);
++            server.getUnsafe().checkSupported(this.description);
 +
 +            final PluginClassLoader loader;
 +            try {
-+                loader = new PluginClassLoader(getClass().getClassLoader(), description, dataFolder, path.toFile(), LIBRARY_LOADER.createLoader(description)); // Paper
++                loader = new PluginClassLoader(this.getClass().getClassLoader(), this.description, dataFolder, this.path.toFile(), LIBRARY_LOADER.createLoader(this.description)); // Paper
 +            } catch (InvalidPluginException ex) {
 +                throw ex;
 +            } catch (Throwable ex) {
