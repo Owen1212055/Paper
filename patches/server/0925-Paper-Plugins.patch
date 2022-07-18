@@ -3,7 +3,7 @@ From: Owen1212055 <23108066+Owen1212055@users.noreply.github.com>
 Date: Wed, 6 Jul 2022 23:00:31 -0400
 Subject: [PATCH] Paper Plugins
 
-Squashed Patches: 
+Squashed Patches:
 These patches (will) be merged into this as this PR removes the usages of the files that these patches modify.
 
 - Fix plugin provides load order (Nassim Jahnke <jahnke.nassim@gmail.com>)
@@ -16,10 +16,10 @@ These patches (will) be merged into this as this PR removes the usages of the fi
 - Make JavaPluginLoader thread-safe (Trigary <trigary0@gmail.com>)
 - Prioritise own classes where possible (Mariell Hoversholm <proximyst@proximyst.com>)
 - Automatically disable plugins that fail to load (Aikar <aikar@aikar.co>)
-- Add an asterisk to legacy API plugins (Phoenix616 <max@themoep.de>) 
+- Add an asterisk to legacy API plugins (Phoenix616 <max@themoep.de>)
 - Make /plugins list alphabetical (BillyGalbreath <Blake.Galbreath@GMail.com>)
 
-PATCHES TO MODIFY: 
+PATCHES TO MODIFY:
 - Add command line option to load extra plugin jars not in the plugins folder (Jason Penilla <11360596+jpenilla@users.noreply.github.com>)
 - Add command to reload permissions.yml and require confirm to reload (William <admin@domnian.com>)
 - Add exception reporting event (Zach Brown <zach.brown@destroystokyo.com>)
@@ -526,6 +526,51 @@ index 0000000000000000000000000000000000000000..f72dc2655e8bf5bf311d0d05cc147046
 +        return this.pluginProviderStorage.getRegisteredProviders();
 +    }
 +}
+diff --git a/src/main/java/io/papermc/paper/plugin/manager/NormalPaperPermissionManager.java b/src/main/java/io/papermc/paper/plugin/manager/NormalPaperPermissionManager.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..29f8845bbad88e88e11e6365a867e37228bcf6fd
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/manager/NormalPaperPermissionManager.java
+@@ -0,0 +1,39 @@
++package io.papermc.paper.plugin.manager;
++
++import org.bukkit.permissions.Permissible;
++import org.bukkit.permissions.Permission;
++
++import java.util.*;
++
++class NormalPaperPermissionManager extends PaperPermissionManager {
++
++    private final Map<String, Permission> permissions = new HashMap<>();
++    private final Map<Boolean, Set<Permission>> defaultPerms = new LinkedHashMap<>();
++    private final Map<String, Map<Permissible, Boolean>> permSubs = new HashMap<>();
++    private final Map<Boolean, Map<Permissible, Boolean>> defSubs = new HashMap<>();
++
++    public NormalPaperPermissionManager() {
++        this.defaultPerms().put(true, new LinkedHashSet<>());
++        this.defaultPerms().put(false, new LinkedHashSet<>());
++    }
++
++    @Override
++    public Map<String, Permission> permissions() {
++        return this.permissions;
++    }
++
++    @Override
++    public Map<Boolean, Set<Permission>> defaultPerms() {
++        return this.defaultPerms;
++    }
++
++    @Override
++    public Map<String, Map<Permissible, Boolean>> permSubs() {
++        return this.permSubs;
++    }
++
++    @Override
++    public Map<Boolean, Map<Permissible, Boolean>> defSubs() {
++        return this.defSubs;
++    }
++}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..df7bff948865f0a3d97e0f8008485979fc01f21b
@@ -713,13 +758,14 @@ index 0000000000000000000000000000000000000000..df7bff948865f0a3d97e0f8008485979
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPermissionManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPermissionManager.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..de58d2819bbee393cad8121cef0f9a86f93b3c82
+index 0000000000000000000000000000000000000000..1cd7b52b22285c49d98d4d1e482d944d3e750e75
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPermissionManager.java
-@@ -0,0 +1,174 @@
+@@ -0,0 +1,196 @@
 +package io.papermc.paper.plugin.manager;
 +
 +import com.google.common.collect.ImmutableSet;
++import io.papermc.paper.plugin.PermissionManager;
 +import org.bukkit.permissions.Permissible;
 +import org.bukkit.permissions.Permission;
 +import org.bukkit.permissions.PermissionDefault;
@@ -728,61 +774,75 @@ index 0000000000000000000000000000000000000000..de58d2819bbee393cad8121cef0f9a86
 +
 +import java.util.*;
 +
-+class PaperPermissionManager {
++/**
++ * See
++ * {@link StupidSPMPermissionManagerWrapper}
++ */
++abstract class PaperPermissionManager implements PermissionManager {
 +
-+    private final Map<String, Permission> permissions = new HashMap<>();
-+    private final Map<Boolean, Set<Permission>> defaultPerms = new LinkedHashMap<>();
-+    private final Map<String, Map<Permissible, Boolean>> permSubs = new HashMap<>();
-+    private final Map<Boolean, Map<Permissible, Boolean>> defSubs = new HashMap<>();
++    public abstract Map<String, Permission> permissions();
 +
-+    public PaperPermissionManager() {
-+        this.defaultPerms.put(true, new LinkedHashSet<>());
-+        this.defaultPerms.put(false, new LinkedHashSet<>());
-+    }
++    public abstract Map<Boolean, Set<Permission>> defaultPerms();
 +
++    public abstract Map<String, Map<Permissible, Boolean>> permSubs();
++
++    public abstract Map<Boolean, Map<Permissible, Boolean>> defSubs();
++
++    @Override
 +    @Nullable
 +    public Permission getPermission(@NotNull String name) {
-+        return this.permissions.get(name.toLowerCase(java.util.Locale.ENGLISH));
++        return this.permissions().get(name.toLowerCase(java.util.Locale.ENGLISH));
 +    }
 +
-+
++    @Override
 +    public void addPermission(@NotNull Permission perm) {
 +        this.addPermission(perm, true);
 +    }
 +
++    @Override
++    public void addPermissions(@NotNull List<Permission> permissions) {
++        for (Permission permission : permissions) {
++            this.addPermission(permission, false);
++        }
++        this.dirtyPermissibles();
++    }
++
 +    // Allow suppressing permission default calculations
-+    public void addPermission(@NotNull Permission perm, boolean dirty) {
++    private void addPermission(@NotNull Permission perm, boolean dirty) {
 +        String name = perm.getName().toLowerCase(java.util.Locale.ENGLISH);
 +
-+        if (this.permissions.containsKey(name)) {
++        if (this.permissions().containsKey(name)) {
 +            throw new IllegalArgumentException("The permission " + name + " is already defined!");
 +        }
 +
-+        this.permissions.put(name, perm);
++        this.permissions().put(name, perm);
 +        this.calculatePermissionDefault(perm, dirty);
 +    }
 +
-+
++    @Override
 +    @NotNull
 +    public Set<Permission> getDefaultPermissions(boolean op) {
-+        return ImmutableSet.copyOf(this.defaultPerms.get(op));
++        return ImmutableSet.copyOf(this.defaultPerms().get(op));
 +    }
 +
 +
++    @Override
 +    public void removePermission(@NotNull Permission perm) {
 +        this.removePermission(perm.getName());
 +    }
 +
 +
++    @Override
 +    public void removePermission(@NotNull String name) {
-+        this.permissions.remove(name.toLowerCase(java.util.Locale.ENGLISH));
++        this.permissions().remove(name.toLowerCase(java.util.Locale.ENGLISH));
 +    }
 +
-+
-+    void recalculatePermissionDefaults(@NotNull Permission perm) {
-+        if (this.permissions.containsKey(perm.getName().toLowerCase(Locale.ENGLISH))) {
-+            this.defaultPerms.get(true).remove(perm);
-+            this.defaultPerms.get(false).remove(perm);
++    @Override
++    public void recalculatePermissionDefaults(@NotNull Permission perm) {
++        // we need a null check here because some plugins for some unknown reason pass null into this?
++        if (perm != null && this.permissions().containsKey(perm.getName().toLowerCase(Locale.ENGLISH))) {
++            this.defaultPerms().get(true).remove(perm);
++            this.defaultPerms().get(false).remove(perm);
 +
 +            this.calculatePermissionDefault(perm, true);
 +        }
@@ -790,20 +850,102 @@ index 0000000000000000000000000000000000000000..de58d2819bbee393cad8121cef0f9a86
 +
 +    private void calculatePermissionDefault(@NotNull Permission perm, boolean dirty) {
 +        if ((perm.getDefault() == PermissionDefault.OP) || (perm.getDefault() == PermissionDefault.TRUE)) {
-+            this.defaultPerms.get(true).add(perm);
++            this.defaultPerms().get(true).add(perm);
 +            if (dirty) {
 +                this.dirtyPermissibles(true);
 +            }
 +        }
 +        if ((perm.getDefault() == PermissionDefault.NOT_OP) || (perm.getDefault() == PermissionDefault.TRUE)) {
-+            this.defaultPerms.get(false).add(perm);
++            this.defaultPerms().get(false).add(perm);
 +            if (dirty) {
 +                this.dirtyPermissibles(false);
 +            }
 +        }
 +    }
 +
-+    public void dirtyPermissibles(boolean op) {
++
++    @Override
++    public void subscribeToPermission(@NotNull String permission, @NotNull Permissible permissible) {
++        String name = permission.toLowerCase(java.util.Locale.ENGLISH);
++        Map<Permissible, Boolean> map = this.permSubs().computeIfAbsent(name, k -> new WeakHashMap<>());
++
++        map.put(permissible, true);
++    }
++
++    @Override
++    public void unsubscribeFromPermission(@NotNull String permission, @NotNull Permissible permissible) {
++        String name = permission.toLowerCase(java.util.Locale.ENGLISH);
++        Map<Permissible, Boolean> map = this.permSubs().get(name);
++
++        if (map != null) {
++            map.remove(permissible);
++
++            if (map.isEmpty()) {
++                this.permSubs().remove(name);
++            }
++        }
++    }
++
++    @Override
++    @NotNull
++    public Set<Permissible> getPermissionSubscriptions(@NotNull String permission) {
++        String name = permission.toLowerCase(java.util.Locale.ENGLISH);
++        Map<Permissible, Boolean> map = this.permSubs().get(name);
++
++        if (map == null) {
++            return ImmutableSet.of();
++        } else {
++            return ImmutableSet.copyOf(map.keySet());
++        }
++    }
++
++    @Override
++    public void subscribeToDefaultPerms(boolean op, @NotNull Permissible permissible) {
++        Map<Permissible, Boolean> map = this.defSubs().computeIfAbsent(op, k -> new WeakHashMap<>());
++
++        map.put(permissible, true);
++    }
++
++    @Override
++    public void unsubscribeFromDefaultPerms(boolean op, @NotNull Permissible permissible) {
++        Map<Permissible, Boolean> map = this.defSubs().get(op);
++
++        if (map != null) {
++            map.remove(permissible);
++
++            if (map.isEmpty()) {
++                this.defSubs().remove(op);
++            }
++        }
++    }
++
++    @Override
++    @NotNull
++    public Set<Permissible> getDefaultPermSubscriptions(boolean op) {
++        Map<Permissible, Boolean> map = this.defSubs().get(op);
++
++        if (map == null) {
++            return ImmutableSet.of();
++        } else {
++            return ImmutableSet.copyOf(map.keySet());
++        }
++    }
++
++    @Override
++    @NotNull
++    public Set<Permission> getPermissions() {
++        return new HashSet<>(this.permissions().values());
++    }
++
++    @Override
++    public void clearPermissions() {
++        this.permissions().clear();
++        this.defaultPerms().get(true).clear();
++        this.defaultPerms().get(false).clear();
++    }
++
++
++    void dirtyPermissibles(boolean op) {
 +        Set<Permissible> permissibles = this.getDefaultPermSubscriptions(op);
 +
 +        for (Permissible p : permissibles) {
@@ -811,92 +953,17 @@ index 0000000000000000000000000000000000000000..de58d2819bbee393cad8121cef0f9a86
 +        }
 +    }
 +
-+
-+    public void subscribeToPermission(@NotNull String permission, @NotNull Permissible permissible) {
-+        String name = permission.toLowerCase(java.util.Locale.ENGLISH);
-+        Map<Permissible, Boolean> map = this.permSubs.computeIfAbsent(name, k -> new WeakHashMap<>());
-+
-+        map.put(permissible, true);
++    void dirtyPermissibles() {
++        this.dirtyPermissibles(true);
++        this.dirtyPermissibles(false);
 +    }
-+
-+
-+    public void unsubscribeFromPermission(@NotNull String permission, @NotNull Permissible permissible) {
-+        String name = permission.toLowerCase(java.util.Locale.ENGLISH);
-+        Map<Permissible, Boolean> map = this.permSubs.get(name);
-+
-+        if (map != null) {
-+            map.remove(permissible);
-+
-+            if (map.isEmpty()) {
-+                this.permSubs.remove(name);
-+            }
-+        }
-+    }
-+
-+
-+    @NotNull
-+    public Set<Permissible> getPermissionSubscriptions(@NotNull String permission) {
-+        String name = permission.toLowerCase(java.util.Locale.ENGLISH);
-+        Map<Permissible, Boolean> map = this.permSubs.get(name);
-+
-+        if (map == null) {
-+            return ImmutableSet.of();
-+        } else {
-+            return ImmutableSet.copyOf(map.keySet());
-+        }
-+    }
-+
-+
-+    public void subscribeToDefaultPerms(boolean op, @NotNull Permissible permissible) {
-+        Map<Permissible, Boolean> map = this.defSubs.computeIfAbsent(op, k -> new WeakHashMap<>());
-+
-+        map.put(permissible, true);
-+    }
-+
-+
-+    public void unsubscribeFromDefaultPerms(boolean op, @NotNull Permissible permissible) {
-+        Map<Permissible, Boolean> map = this.defSubs.get(op);
-+
-+        if (map != null) {
-+            map.remove(permissible);
-+
-+            if (map.isEmpty()) {
-+                this.defSubs.remove(op);
-+            }
-+        }
-+    }
-+
-+
-+    @NotNull
-+    public Set<Permissible> getDefaultPermSubscriptions(boolean op) {
-+        Map<Permissible, Boolean> map = this.defSubs.get(op);
-+
-+        if (map == null) {
-+            return ImmutableSet.of();
-+        } else {
-+            return ImmutableSet.copyOf(map.keySet());
-+        }
-+    }
-+
-+
-+    @NotNull
-+    public Set<Permission> getPermissions() {
-+        return new HashSet<>(this.permissions.values());
-+    }
-+
-+    public void clearPermissions() {
-+        this.permissions.clear();
-+        this.defaultPerms.get(true).clear();
-+        this.defaultPerms.get(false).clear();
-+    }
-+
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0c8cb24b2aae05472e48705acba164cf374cda4c
+index 0000000000000000000000000000000000000000..0473d0a764016bcc127696e73e0c39149dfbf5eb
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
-@@ -0,0 +1,341 @@
+@@ -0,0 +1,376 @@
 +package io.papermc.paper.plugin.manager;
 +
 +import com.google.common.base.Preconditions;
@@ -905,6 +972,9 @@ index 0000000000000000000000000000000000000000..0c8cb24b2aae05472e48705acba164cf
 +import com.google.common.graph.MutableGraph;
 +import io.papermc.paper.plugin.configuration.PluginConfiguration;
 +import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.configuration.PaperPluginConfiguration;
++import io.papermc.paper.plugin.provider.configuration.type.PaperCommand;
++import io.papermc.paper.plugin.provider.configuration.type.PaperCommandMap;
 +import io.papermc.paper.plugin.provider.service.classloader.ConfiguredPluginClassLoader;
 +import io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoaderStorage;
 +import io.papermc.paper.plugin.provider.service.entrypoint.Entrypoint;
@@ -916,6 +986,7 @@ index 0000000000000000000000000000000000000000..0c8cb24b2aae05472e48705acba164cf
 +import org.bukkit.World;
 +import org.bukkit.command.Command;
 +import org.bukkit.command.CommandMap;
++import org.bukkit.command.PluginCommand;
 +import org.bukkit.command.PluginCommandYamlParser;
 +import org.bukkit.event.HandlerList;
 +import org.bukkit.event.server.PluginDisableEvent;
@@ -1096,10 +1167,38 @@ index 0000000000000000000000000000000000000000..0c8cb24b2aae05472e48705acba164cf
 +
 +    public synchronized void enablePlugin(@NotNull Plugin plugin) {
 +        if (!plugin.isEnabled()) {
-+            List<Command> pluginCommands = PluginCommandYamlParser.parse(plugin);
++            if (plugin.getConfiguration() instanceof PaperPluginConfiguration paperPluginConfiguration) {
++                PaperCommandMap commandMap = paperPluginConfiguration.getCommandMap();
 +
-+            if (!pluginCommands.isEmpty()) {
-+                this.commandMap.registerAll(plugin.getConfiguration().getIdentifier(), pluginCommands);
++                for (Map.Entry<String, PaperCommand> entry : commandMap.getCommands().entrySet()) {
++                    Command newCmd = new PluginCommand(entry.getKey(), plugin);
++
++                    PaperCommand command = entry.getValue();
++
++                    String description = command.description();
++                    if (description != null) {
++                        newCmd.setDescription(description);
++                    }
++                    String usage = command.usage();
++                    if (usage != null) {
++                        newCmd.setUsage(usage);
++                    }
++                    String permission = command.permission();
++                    if (permission != null) {
++                        newCmd.setPermission(permission);
++                    }
++
++                    newCmd.setAliases(command.aliases());
++                    newCmd.permissionMessage(command.permissionMessage());
++
++                    this.commandMap.register(paperPluginConfiguration.getIdentifier(), newCmd);
++                }
++            } else {
++                List<Command> bukkitCommands = PluginCommandYamlParser.parse(plugin);
++
++                if (!bukkitCommands.isEmpty()) {
++                    this.commandMap.registerAll(plugin.getConfiguration().getIdentifier(), bukkitCommands);
++                }
 +            }
 +
 +            try {
@@ -1164,6 +1263,9 @@ index 0000000000000000000000000000000000000000..0c8cb24b2aae05472e48705acba164cf
 +                } catch (IOException ex) {
 +                    this.server.getLogger().log(Level.WARNING, "Error closing the classloader for '" + pluginName + "'", ex); // Paper - log exception
 +                }
++                // Remove from the classloader pool inorder to prevent plugins from trying
++                // to access classes
++                PaperPluginClassLoaderStorage.INSTANCE.remove(configuredPluginClassLoader);
 +            }
 +
 +        } catch (Throwable ex) {
@@ -1235,43 +1337,56 @@ index 0000000000000000000000000000000000000000..0c8cb24b2aae05472e48705acba164cf
 +    }
 +
 +    public boolean hasDependency(String pluginIdentifier) {
-+        return this.isPluginEnabled(pluginIdentifier);
++        return this.getPlugin(pluginIdentifier) != null;
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginManagerImpl.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginManagerImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..b2376a024e5e42398b01493fec3641a88e3baf7e
+index 0000000000000000000000000000000000000000..0421e5a8e1f6809e1d2ed29ae17c2c527778e546
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginManagerImpl.java
-@@ -0,0 +1,216 @@
+@@ -0,0 +1,225 @@
 +package io.papermc.paper.plugin.manager;
 +
 +import io.papermc.paper.plugin.DependencyContext;
++import io.papermc.paper.plugin.PermissionManager;
 +import io.papermc.paper.plugin.configuration.PluginConfiguration;
++import org.bukkit.Bukkit;
 +import org.bukkit.Server;
 +import org.bukkit.command.CommandMap;
++import org.bukkit.craftbukkit.CraftServer;
 +import org.bukkit.event.Event;
 +import org.bukkit.event.EventPriority;
 +import org.bukkit.event.Listener;
 +import org.bukkit.permissions.Permissible;
 +import org.bukkit.permissions.Permission;
 +import org.bukkit.plugin.*;
-+import org.jetbrains.annotations.ApiStatus;
 +import org.jetbrains.annotations.NotNull;
 +import org.jetbrains.annotations.Nullable;
 +
 +import java.io.File;
++import java.util.List;
 +import java.util.Set;
 +
 +public class PaperPluginManagerImpl implements PluginManager, DependencyContext {
 +
-+    private final PaperPermissionManager permissionManager = new PaperPermissionManager();
 +    private final PaperPluginInstanceManager instanceManager;
 +    private final PaperEventManager paperEventManager;
 +
-+    public PaperPluginManagerImpl(Server server, CommandMap commandMap) {
++
++    private PermissionManager permissionManager;
++
++    public PaperPluginManagerImpl(Server server, CommandMap commandMap, SimplePluginManager permissionManager) {
 +        this.instanceManager = new PaperPluginInstanceManager(this, commandMap, server);
 +        this.paperEventManager = new PaperEventManager(server);
++        //this.permissionManager = new PaperPermissionManager();
++        this.permissionManager = new StupidSPMPermissionManagerWrapper(permissionManager); // TODO: See comment when SimplePermissionManager is removed
++    }
++
++    // REMOVE THIS WHEN SimplePluginManager is removed.
++    // Just cast and use Bukkit.getServer().getPluginManager()
++    public static PaperPluginManagerImpl getInstance() {
++        return ((CraftServer) (Bukkit.getServer())).paperPluginManager;
 +    }
 +
 +    // Plugin Manipulation
@@ -1429,23 +1544,19 @@ index 0000000000000000000000000000000000000000..b2376a024e5e42398b01493fec3641a8
 +        return this.permissionManager.getPermissions();
 +    }
 +
-+    @ApiStatus.Internal
-+    public void addPermission(@NotNull Permission perm, boolean dirty) {
-+        this.permissionManager.addPermission(perm, dirty);
++    @Override
++    public void addPermissions(@NotNull List<Permission> perm) {
++        this.permissionManager.addPermissions(perm);
 +    }
 +
++    @Override
 +    public void clearPermissions() {
 +        this.permissionManager.clearPermissions();
 +    }
 +
-+    @ApiStatus.Internal
-+    public void dirtyPermissibles() {
-+        this.dirtyPermissibles(true);
-+        this.dirtyPermissibles(false);
-+    }
-+
-+    public void dirtyPermissibles(boolean op) {
-+        this.permissionManager.dirtyPermissibles(op);
++    @Override
++    public void overridePermissionManager(@Nullable Plugin plugin, @Nullable PermissionManager permissionManager) {
++        this.permissionManager = permissionManager;
 +    }
 +
 +    // Etc
@@ -1520,6 +1631,53 @@ index 0000000000000000000000000000000000000000..dc272b2106818277d33e1427f11e214f
 +
 +    public List<JavaPlugin> getLoaded() {
 +        return this.provided;
++    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/manager/StupidSPMPermissionManagerWrapper.java b/src/main/java/io/papermc/paper/plugin/manager/StupidSPMPermissionManagerWrapper.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..51133e01a6fb386ecc606322b9193504d5889131
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/manager/StupidSPMPermissionManagerWrapper.java
+@@ -0,0 +1,41 @@
++package io.papermc.paper.plugin.manager;
++
++import org.bukkit.permissions.Permissible;
++import org.bukkit.permissions.Permission;
++import org.bukkit.plugin.SimplePluginManager;
++
++import java.util.*;
++
++/*
++This is actually so cursed I hate it.
++We need to wrap these in fields as people override the fields, so we need to access them lazily at all times.
++// TODO: When SimplePluginManager is GONE remove this and cleanup the PaperPermissionManager to use actual fields.
++ */
++class StupidSPMPermissionManagerWrapper extends PaperPermissionManager {
++
++    private final SimplePluginManager simplePluginManager;
++
++    public StupidSPMPermissionManagerWrapper(SimplePluginManager simplePluginManager) {
++        this.simplePluginManager = simplePluginManager;
++    }
++
++    @Override
++    public Map<String, Permission> permissions() {
++        return this.simplePluginManager.permissions;
++    }
++
++    @Override
++    public Map<Boolean, Set<Permission>> defaultPerms() {
++        return this.simplePluginManager.defaultPerms;
++    }
++
++    @Override
++    public Map<String, Map<Permissible, Boolean>> permSubs() {
++        return this.simplePluginManager.permSubs;
++    }
++
++    @Override
++    public Map<Boolean, Map<Permissible, Boolean>> defSubs() {
++        return this.simplePluginManager.defSubs;
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java b/src/main/java/io/papermc/paper/plugin/provider/PluginProvider.java
@@ -2861,10 +3019,10 @@ index 0000000000000000000000000000000000000000..2ddb96543ec54e7b0a1fd21bdec092bd
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ServerPluginProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ServerPluginProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..6af27da28317e3597a0ba1fe186d9b94c7c28fd0
+index 0000000000000000000000000000000000000000..88f570ae51511efc6a911f65ff000bf332d49eca
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/ServerPluginProviderStorage.java
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,87 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered;
 +
 +import io.papermc.paper.plugin.DependencyContext;
@@ -2898,7 +3056,7 @@ index 0000000000000000000000000000000000000000..6af27da28317e3597a0ba1fe186d9b94
 +            @Override
 +            public void applyContext(PluginProvider<JavaPlugin> provider, DependencyContext dependencyContext) {
 +                if (provider instanceof DependencyContextHolder contextHolder) {
-+                    contextHolder.setContext(dependencyContext);
++                    contextHolder.setContext(PaperPluginManagerImpl.getInstance());
 +                }
 +            }
 +
@@ -2906,6 +3064,7 @@ index 0000000000000000000000000000000000000000..6af27da28317e3597a0ba1fe186d9b94
 +            public boolean load(PluginProvider<JavaPlugin> provider, JavaPlugin provided) {
 +                try {
 +                    provided.getLogger().info(String.format("Loading server plugin %s", provided.getConfiguration().getDisplayName()));
++                    PaperPluginManagerImpl.getInstance().loadPlugin(provided); // We have to add it to the map before the plugin is loaded
 +                    provided.onLoad();
 +                    return true;
 +                } catch (Throwable ex) {
@@ -2919,44 +3078,8 @@ index 0000000000000000000000000000000000000000..6af27da28317e3597a0ba1fe186d9b94
 +        });
 +    }
 +
-+    public static void setupJavaplugin(JavaPlugin plugin) {
-+        if (plugin.getConfiguration() instanceof PaperPluginConfiguration paperPluginConfiguration) {
-+            PaperCommandMap commandMap = paperPluginConfiguration.getCommandMap();
-+
-+            for (Map.Entry<String, PaperCommand> entry : commandMap.getCommands().entrySet()) {
-+                Command newCmd = new PluginCommand(entry.getKey(), plugin);
-+
-+                PaperCommand command = entry.getValue();
-+
-+                String description = command.description();
-+                if (description != null) {
-+                    newCmd.setDescription(description);
-+                }
-+                String usage = command.usage();
-+                if (usage != null) {
-+                    newCmd.setUsage(usage);
-+                }
-+                String permission = command.permission();
-+                if (permission != null) {
-+                    newCmd.setPermission(permission);
-+                }
-+
-+                newCmd.setAliases(command.aliases());
-+                newCmd.permissionMessage(command.permissionMessage());
-+
-+                Bukkit.getCommandMap().register(paperPluginConfiguration.getIdentifier(), newCmd);
-+            }
-+        }
-+
-+        ((PaperPluginManagerImpl) Bukkit.getPluginManager()).loadPlugin(plugin);
-+    }
-+
 +    @Override
 +    public void processProvided(JavaPlugin provided) {
-+        setupJavaplugin(provided);
-+        if (provided.getClass().getClassLoader() instanceof DependencyContextHolder contextHolder) {
-+            contextHolder.setContext(((PaperPluginManagerImpl) Bukkit.getPluginManager()));
-+        }
 +    }
 +
 +    @Override
@@ -4683,37 +4806,20 @@ index 0a843e0afbcb1af8e2641515eb244b791b819b8c..5d563a8c9520a348b61b7122cead76aa
              Util.startTimerHackThread();
              Path path = Paths.get("server.properties");
 diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..f5edd58731fb1ada7ba7cfe97da0ac2e8d9ffbb7 100644
+index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..d94cd7da7eee3954f443452a2f3e6cb8e2ba1bfb 100644
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-@@ -16,6 +16,7 @@ import com.mojang.serialization.Lifecycle;
- import io.netty.buffer.ByteBuf;
- import io.netty.buffer.ByteBufOutputStream;
- import io.netty.buffer.Unpooled;
-+import io.papermc.paper.plugin.manager.PaperPluginManagerImpl;
- import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
- import java.awt.image.BufferedImage;
- import java.io.File;
-@@ -224,9 +225,7 @@ import org.bukkit.plugin.Plugin;
- import org.bukkit.plugin.PluginLoadOrder;
- import org.bukkit.plugin.PluginManager;
- import org.bukkit.plugin.ServicesManager;
--import org.bukkit.plugin.SimplePluginManager;
- import org.bukkit.plugin.SimpleServicesManager;
--import org.bukkit.plugin.java.JavaPluginLoader;
- import org.bukkit.plugin.messaging.Messenger;
- import org.bukkit.plugin.messaging.StandardMessenger;
- import org.bukkit.potion.Potion;
-@@ -255,7 +254,7 @@ public final class CraftServer implements Server {
+@@ -255,7 +255,8 @@ public final class CraftServer implements Server {
      private final CraftCommandMap commandMap = new CraftCommandMap(this);
      private final SimpleHelpMap helpMap = new SimpleHelpMap(this);
      private final StandardMessenger messenger = new StandardMessenger();
 -    private final SimplePluginManager pluginManager = new SimplePluginManager(this, this.commandMap);
-+    private final PaperPluginManagerImpl pluginManager = new PaperPluginManagerImpl(this, this.commandMap); // Paper
++    private final SimplePluginManager pluginManager = new SimplePluginManager(this, commandMap);
++    public final io.papermc.paper.plugin.manager.PaperPluginManagerImpl paperPluginManager = new io.papermc.paper.plugin.manager.PaperPluginManagerImpl(this, this.commandMap, pluginManager); {this.pluginManager.paperPluginManager = this.paperPluginManager;} // Paper
      private final StructureManager structureManager;
      protected final DedicatedServer console;
      protected final DedicatedPlayerList playerList;
-@@ -357,7 +356,7 @@ public final class CraftServer implements Server {
+@@ -357,7 +358,7 @@ public final class CraftServer implements Server {
          this.saveCommandsConfig();
          this.overrideAllCommandBlockCommands = this.commandsConfiguration.getStringList("command-block-overrides").contains("*");
          this.ignoreVanillaPermissions = this.commandsConfiguration.getBoolean("ignore-vanilla-permissions");
@@ -4722,7 +4828,7 @@ index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..f5edd58731fb1ada7ba7cfe97da0ac2e
          this.overrideSpawnLimits();
          console.autosavePeriod = this.configuration.getInt("ticks-per.autosave");
          this.warningState = WarningState.value(this.configuration.getString("settings.deprecated-verbose"));
-@@ -409,29 +408,7 @@ public final class CraftServer implements Server {
+@@ -409,29 +410,7 @@ public final class CraftServer implements Server {
      }
  
      public void loadPlugins() {
@@ -4753,7 +4859,31 @@ index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..f5edd58731fb1ada7ba7cfe97da0ac2e
      }
  
      // Paper start
-@@ -2790,7 +2767,7 @@ public final class CraftServer implements Server {
+@@ -550,15 +529,17 @@ public final class CraftServer implements Server {
+     private void enablePlugin(Plugin plugin) {
+         try {
+             List<Permission> perms = plugin.getDescription().getPermissions();
+-
++            List<Permission> permsToLoad = new ArrayList<>(); // Paper
+             for (Permission perm : perms) {
+-                try {
+-                    this.pluginManager.addPermission(perm, false);
+-                } catch (IllegalArgumentException ex) {
+-                    this.getLogger().log(Level.WARNING, "Plugin " + plugin.getDescription().getFullName() + " tried to register permission '" + perm.getName() + "' but it's already registered", ex);
++                // Paper start
++                if (this.paperPluginManager.getPermission(perm.getName()) == null) {
++                    permsToLoad.add(perm);
++                } else {
++                    this.getLogger().log(Level.WARNING, "Plugin " + plugin.getDescription().getFullName() + " tried to register permission '" + perm.getName() + "' but it's already registered");
++                // Paper end
+                 }
+             }
+-            this.pluginManager.dirtyPermissibles();
++            this.paperPluginManager.addPermissions(permsToLoad); // Paper
+ 
+             this.pluginManager.enablePlugin(plugin);
+         } catch (Throwable ex) {
+@@ -2790,7 +2771,7 @@ public final class CraftServer implements Server {
  
      @Override
      public void reloadPermissions() {
