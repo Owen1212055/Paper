@@ -1312,6 +1312,18 @@ index 08aef59d8443038771704d9587e31f299e587307..ef3d1b9cf93903d50f11d3504ee5a652
      @NotNull
      public PluginLoader getPluginLoader();
  
+diff --git a/src/main/java/org/bukkit/plugin/PluginBase.java b/src/main/java/org/bukkit/plugin/PluginBase.java
+index 94f8ceb965cecb5669a84a0ec61c0f706c2a2673..e670c89feafcdbc003a3a615e2003d7cea4a014d 100644
+--- a/src/main/java/org/bukkit/plugin/PluginBase.java
++++ b/src/main/java/org/bukkit/plugin/PluginBase.java
+@@ -31,6 +31,6 @@ public abstract class PluginBase implements Plugin {
+     @Override
+     @NotNull
+     public final String getName() {
+-        return getDescription().getName();
++        return getConfiguration().getIdentifier(); // Paper
+     }
+ }
 diff --git a/src/main/java/org/bukkit/plugin/PluginDescriptionFile.java b/src/main/java/org/bukkit/plugin/PluginDescriptionFile.java
 index 0c9f4d1e9104fa6951114c1f9ec954dfcc749196..f4439d634e5c63b0dad715c87c255e11548c5538 100644
 --- a/src/main/java/org/bukkit/plugin/PluginDescriptionFile.java
@@ -1909,18 +1921,10 @@ index 3bea5dd67ad0393160ccede4ac99a3c7baa1803b..02a1650e450923afaf6c17116c48de54
      }
  
 diff --git a/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java b/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java
-index 8ff78fad47f6086aa289e32590f4fbec24b3d500..1d345977ebf5edcf6386e79b933ec6001d5dcd7f 100644
+index 8ff78fad47f6086aa289e32590f4fbec24b3d500..cbf0129ed98bb2f02ba7f4a3c53cc51593cb2b21 100644
 --- a/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java
 +++ b/src/main/java/org/bukkit/plugin/java/JavaPluginLoader.java
-@@ -5,7 +5,6 @@ import java.io.File;
- import java.io.FileNotFoundException;
- import java.io.IOException;
- import java.io.InputStream;
--import java.lang.reflect.InvocationTargetException;
- import java.lang.reflect.Method;
- import java.util.Arrays;
- import java.util.Collection;
-@@ -49,6 +48,7 @@ import org.yaml.snakeyaml.error.YAMLException;
+@@ -49,6 +49,7 @@ import org.yaml.snakeyaml.error.YAMLException;
  /**
   * Represents a Java plugin loader, allowing plugins in the form of .jar
   */
@@ -1928,7 +1932,7 @@ index 8ff78fad47f6086aa289e32590f4fbec24b3d500..1d345977ebf5edcf6386e79b933ec600
  public final class JavaPluginLoader implements PluginLoader {
      final Server server;
      private static final boolean DISABLE_CLASS_PRIORITIZATION = Boolean.getBoolean("Paper.DisableClassPrioritization"); // Paper
-@@ -150,7 +150,7 @@ public final class JavaPluginLoader implements PluginLoader {
+@@ -150,7 +151,7 @@ public final class JavaPluginLoader implements PluginLoader {
  
          final PluginClassLoader loader;
          try {
@@ -2116,6 +2120,280 @@ index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a
 +    }
      // Paper end
  }
+diff --git a/src/test/java/org/bukkit/TestServer.java b/src/test/java/org/bukkit/TestServer.java
+index 2f907c18c8f3228df107bfc05c5454354e89b943..8be85a159f8bde4b55a06f206424475450c70c0a 100644
+--- a/src/test/java/org/bukkit/TestServer.java
++++ b/src/test/java/org/bukkit/TestServer.java
+@@ -42,15 +42,7 @@ public final class TestServer implements InvocationHandler {
+                 }
+             );
+             // Paper end
+-            methodMap.put(
+-                    Server.class.getMethod("getPluginManager"),
+-                    new MethodHandler() {
+-                        @Override
+-                        public Object handle(TestServer server, Object[] args) {
+-                            return server.pluginManager;
+-                        }
+-                    }
+-                );
++            // Paper - Remove plugin manager tests
+             methodMap.put(
+                     Server.class.getMethod("getLogger"),
+                     new MethodHandler() {
+@@ -114,7 +106,7 @@ public final class TestServer implements InvocationHandler {
+             TestServer server = new TestServer();
+             Server instance = Proxy.getProxyClass(Server.class.getClassLoader(), Server.class).asSubclass(Server.class).getConstructor(InvocationHandler.class).newInstance(server);
+             Bukkit.setServer(instance);
+-            server.pluginManager = new SimplePluginManager(instance, new SimpleCommandMap(instance));
++            // Paper - Remove plugin manager tests
+         } catch (Throwable t) {
+             throw new Error(t);
+         }
+diff --git a/src/test/java/org/bukkit/event/SyntheticEventTest.java b/src/test/java/org/bukkit/event/SyntheticEventTest.java
+deleted file mode 100644
+index d402cb59f508205ebe9ee450594826b04cecb90b..0000000000000000000000000000000000000000
+--- a/src/test/java/org/bukkit/event/SyntheticEventTest.java
++++ /dev/null
+@@ -1,48 +0,0 @@
+-package org.bukkit.event;
+-
+-import org.bukkit.TestServer;
+-import org.bukkit.plugin.PluginLoader;
+-import org.bukkit.plugin.SimplePluginManager;
+-import org.bukkit.plugin.TestPlugin;
+-import org.bukkit.plugin.java.JavaPluginLoader;
+-import org.junit.Assert;
+-import org.junit.Test;
+-
+-public class SyntheticEventTest {
+-    @SuppressWarnings("deprecation")
+-    @Test
+-    public void test() {
+-        final JavaPluginLoader loader = new JavaPluginLoader(TestServer.getInstance());
+-        TestPlugin plugin = new TestPlugin(getClass().getName()) {
+-            @Override
+-            public PluginLoader getPluginLoader() {
+-                return loader;
+-            }
+-        };
+-        SimplePluginManager pluginManager = new SimplePluginManager(TestServer.getInstance(), null);
+-
+-        TestEvent event = new TestEvent(false);
+-        Impl impl = new Impl();
+-
+-        pluginManager.registerEvents(impl, plugin);
+-        pluginManager.callEvent(event);
+-
+-        Assert.assertEquals(1, impl.callCount);
+-    }
+-
+-    public abstract static class Base<E extends Event> implements Listener {
+-        int callCount = 0;
+-
+-        public void accept(E evt) {
+-            callCount++;
+-        }
+-    }
+-
+-    public static class Impl extends Base<TestEvent> {
+-        @Override
+-        @EventHandler
+-        public void accept(TestEvent evt) {
+-            super.accept(evt);
+-        }
+-    }
+-}
+diff --git a/src/test/java/org/bukkit/plugin/PluginManagerTest.java b/src/test/java/org/bukkit/plugin/PluginManagerTest.java
+deleted file mode 100644
+index 1941c9f49e9514c1236c5f4ea9f7af47f7be85c5..0000000000000000000000000000000000000000
+--- a/src/test/java/org/bukkit/plugin/PluginManagerTest.java
++++ /dev/null
+@@ -1,184 +0,0 @@
+-package org.bukkit.plugin;
+-
+-import static org.hamcrest.Matchers.*;
+-import static org.junit.Assert.*;
+-import org.bukkit.TestServer;
+-import org.bukkit.event.Event;
+-import org.bukkit.event.TestEvent;
+-import org.bukkit.permissions.Permission;
+-import org.junit.After;
+-import org.junit.Test;
+-
+-public class PluginManagerTest {
+-    private class MutableObject {
+-        volatile Object value = null;
+-    }
+-
+-    private static final PluginManager pm = TestServer.getInstance().getPluginManager();
+-
+-    private final MutableObject store = new MutableObject();
+-/* // Paper start - remove unneeded test
+-    @Test
+-    public void testAsyncSameThread() {
+-        final Event event = new TestEvent(true);
+-        try {
+-            pm.callEvent(event);
+-        } catch (IllegalStateException ex) {
+-            assertThat(event.getEventName() + " cannot be triggered asynchronously from primary server thread.", is(ex.getMessage()));
+-            return;
+-        }
+-        throw new IllegalStateException("No exception thrown");
+-    }*/ // Paper end
+-
+-    @Test
+-    public void testSyncSameThread() {
+-        final Event event = new TestEvent(false);
+-        pm.callEvent(event);
+-    }
+-/* // Paper start - remove unneeded test
+-    @Test
+-    public void testAsyncLocked() throws InterruptedException {
+-        final Event event = new TestEvent(true);
+-        Thread secondThread = new Thread(
+-            new Runnable() {
+-                @Override
+-                public void run() {
+-                    try {
+-                        synchronized (pm) {
+-                            pm.callEvent(event);
+-                        }
+-                    } catch (Throwable ex) {
+-                        store.value = ex;
+-                    }
+-                }
+-            }
+-        );
+-        secondThread.start();
+-        secondThread.join();
+-        assertThat(store.value, is(instanceOf(IllegalStateException.class)));
+-        assertThat(event.getEventName() + " cannot be triggered asynchronously from inside synchronized code.", is(((Throwable) store.value).getMessage()));
+-    }
+-
+-    @Test
+-    public void testAsyncUnlocked() throws InterruptedException {
+-        final Event event = new TestEvent(true);
+-        Thread secondThread = new Thread(
+-            new Runnable() {
+-                @Override
+-                public void run() {
+-                    try {
+-                        pm.callEvent(event);
+-                    } catch (Throwable ex) {
+-                        store.value = ex;
+-                    }
+-                }
+-            }
+-        );
+-        secondThread.start();
+-        secondThread.join();
+-        if (store.value != null) {
+-            throw new RuntimeException((Throwable) store.value);
+-        }
+-    }
+-
+-    @Test
+-    public void testSyncUnlocked() throws InterruptedException {
+-        final Event event = new TestEvent(false);
+-        Thread secondThread = new Thread(
+-            new Runnable() {
+-                @Override
+-                public void run() {
+-                    try {
+-                        pm.callEvent(event);
+-                    } catch (Throwable ex) {
+-                        store.value = ex;
+-                        assertThat(event.getEventName() + " cannot be triggered asynchronously from another thread.", is(ex.getMessage()));
+-                        return;
+-                    }
+-                }
+-            }
+-        );
+-        secondThread.start();
+-        secondThread.join();
+-        if (store.value == null) {
+-            throw new IllegalStateException("No exception thrown");
+-        }
+-    }
+-
+-    @Test
+-    public void testSyncLocked() throws InterruptedException {
+-        final Event event = new TestEvent(false);
+-        Thread secondThread = new Thread(
+-            new Runnable() {
+-                @Override
+-                public void run() {
+-                    try {
+-                        synchronized (pm) {
+-                            pm.callEvent(event);
+-                        }
+-                    } catch (Throwable ex) {
+-                        store.value = ex;
+-                        assertThat(event.getEventName() + " cannot be triggered asynchronously from another thread.", is(ex.getMessage()));
+-                        return;
+-                    }
+-                }
+-            }
+-        );
+-        secondThread.start();
+-        secondThread.join();
+-        if (store.value == null) {
+-            throw new IllegalStateException("No exception thrown");
+-        }
+-    } */ // Paper
+-
+-    @Test
+-    public void testRemovePermissionByNameLower() {
+-        this.testRemovePermissionByName("lower");
+-    }
+-
+-    @Test
+-    public void testRemovePermissionByNameUpper() {
+-        this.testRemovePermissionByName("UPPER");
+-    }
+-
+-    @Test
+-    public void testRemovePermissionByNameCamel() {
+-        this.testRemovePermissionByName("CaMeL");
+-    }
+-
+-    public void testRemovePermissionByPermissionLower() {
+-        this.testRemovePermissionByPermission("lower");
+-    }
+-
+-    @Test
+-    public void testRemovePermissionByPermissionUpper() {
+-        this.testRemovePermissionByPermission("UPPER");
+-    }
+-
+-    @Test
+-    public void testRemovePermissionByPermissionCamel() {
+-        this.testRemovePermissionByPermission("CaMeL");
+-    }
+-
+-    private void testRemovePermissionByName(final String name) {
+-        final Permission perm = new Permission(name);
+-        pm.addPermission(perm);
+-        assertThat("Permission \"" + name + "\" was not added", pm.getPermission(name), is(perm));
+-        pm.removePermission(name);
+-        assertThat("Permission \"" + name + "\" was not removed", pm.getPermission(name), is(nullValue()));
+-    }
+-
+-    private void testRemovePermissionByPermission(final String name) {
+-        final Permission perm = new Permission(name);
+-        pm.addPermission(perm);
+-        assertThat("Permission \"" + name + "\" was not added", pm.getPermission(name), is(perm));
+-        pm.removePermission(perm);
+-        assertThat("Permission \"" + name + "\" was not removed", pm.getPermission(name), is(nullValue()));
+-    }
+-
+-    @After
+-    public void tearDown() {
+-        pm.clearPlugins();
+-        assertThat(pm.getPermissions(), is(empty()));
+-    }
+-}
 diff --git a/src/test/java/org/bukkit/plugin/TestPlugin.java b/src/test/java/org/bukkit/plugin/TestPlugin.java
 index a8be3e23e3e280ad301d9530de50028515612966..ba743beb6f171bfea4fb17ef6858f73bb740f775 100644
 --- a/src/test/java/org/bukkit/plugin/TestPlugin.java

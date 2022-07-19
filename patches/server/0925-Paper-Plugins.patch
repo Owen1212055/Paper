@@ -573,10 +573,10 @@ index 0000000000000000000000000000000000000000..29f8845bbad88e88e11e6365a867e372
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..df7bff948865f0a3d97e0f8008485979fc01f21b
+index 0000000000000000000000000000000000000000..be11dbf67508fe5ecd744403881ffa7300c689fb
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
-@@ -0,0 +1,179 @@
+@@ -0,0 +1,182 @@
 +package io.papermc.paper.plugin.manager;
 +
 +import co.aikar.timings.TimedEventExecutor;
@@ -755,6 +755,9 @@ index 0000000000000000000000000000000000000000..df7bff948865f0a3d97e0f8008485979
 +        return ret;
 +    }
 +
++    public void clearEvents() {
++        HandlerList.unregisterAll();
++    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPermissionManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPermissionManager.java
 new file mode 100644
@@ -1342,10 +1345,10 @@ index 0000000000000000000000000000000000000000..0473d0a764016bcc127696e73e0c3914
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginManagerImpl.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginManagerImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0421e5a8e1f6809e1d2ed29ae17c2c527778e546
+index 0000000000000000000000000000000000000000..5ed863fddf9fb1cad1261b1e865dfc2f768970f1
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginManagerImpl.java
-@@ -0,0 +1,225 @@
+@@ -0,0 +1,231 @@
 +package io.papermc.paper.plugin.manager;
 +
 +import io.papermc.paper.plugin.DependencyContext;
@@ -1376,11 +1379,15 @@ index 0000000000000000000000000000000000000000..0421e5a8e1f6809e1d2ed29ae17c2c52
 +
 +    private PermissionManager permissionManager;
 +
-+    public PaperPluginManagerImpl(Server server, CommandMap commandMap, SimplePluginManager permissionManager) {
++    public PaperPluginManagerImpl(Server server, CommandMap commandMap, @Nullable SimplePluginManager permissionManager) {
 +        this.instanceManager = new PaperPluginInstanceManager(this, commandMap, server);
 +        this.paperEventManager = new PaperEventManager(server);
-+        //this.permissionManager = new PaperPermissionManager();
-+        this.permissionManager = new StupidSPMPermissionManagerWrapper(permissionManager); // TODO: See comment when SimplePermissionManager is removed
++
++        if (permissionManager == null) {
++            this.permissionManager = new NormalPaperPermissionManager();
++        } else {
++            this.permissionManager = new StupidSPMPermissionManagerWrapper(permissionManager); // TODO: See comment when SimplePermissionManager is removed
++        }
 +    }
 +
 +    // REMOVE THIS WHEN SimplePluginManager is removed.
@@ -1431,8 +1438,10 @@ index 0000000000000000000000000000000000000000..0421e5a8e1f6809e1d2ed29ae17c2c52
 +    }
 +
 +    @Override
-+    public void clearPlugins() {
++    public synchronized void clearPlugins() {
 +        this.instanceManager.clearPlugins();
++        this.permissionManager.clearPermissions();
++        this.paperEventManager.clearEvents();
 +    }
 +
 +    @Override
@@ -3732,10 +3741,10 @@ index 0000000000000000000000000000000000000000..b38b4cf226181afd750da3f3a843061c
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/ModernPluginLoadingStrategy.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/ModernPluginLoadingStrategy.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..5eaa052ac5eca7381515f49777585b0ee6675827
+index 0000000000000000000000000000000000000000..b1ff64e018c77c5f5de1a4700176d9b626fbee65
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/ModernPluginLoadingStrategy.java
-@@ -0,0 +1,139 @@
+@@ -0,0 +1,136 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy;
 +
 +import com.google.common.collect.Lists;
@@ -3747,10 +3756,7 @@ index 0000000000000000000000000000000000000000..5eaa052ac5eca7381515f49777585b0e
 +import io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.ProviderLoader;
 +import org.bukkit.plugin.UnknownDependencyException;
 +
-+import java.util.ArrayList;
-+import java.util.HashMap;
-+import java.util.List;
-+import java.util.Map;
++import java.util.*;
 +import java.util.logging.Level;
 +import java.util.logging.Logger;
 +
@@ -4916,3 +4922,670 @@ index 909b2c98e7a9117d2f737245e4661792ffafb744..2c1936d099f37152631cd8b7cf5f88b2
  
      @Override
      public FileConfiguration getConfig() {
+diff --git a/src/test/java/io/papermc/paper/plugin/DependencyLoadingTest.java b/src/test/java/io/papermc/paper/plugin/DependencyLoadingTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9bfcf9d989a7bccd03d5496b23614aa8661f95d2
+--- /dev/null
++++ b/src/test/java/io/papermc/paper/plugin/DependencyLoadingTest.java
+@@ -0,0 +1,144 @@
++package io.papermc.paper.plugin;
++
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.provider.PluginProvider;
++import io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.ProviderLoader;
++import io.papermc.paper.plugin.provider.service.entrypoint.storage.ordered.strategy.ModernPluginLoadingStrategy;
++import org.junit.Assert;
++import org.junit.Before;
++import org.junit.Test;
++
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.concurrent.atomic.AtomicInteger;
++
++public class DependencyLoadingTest {
++
++    private static List<PluginProvider<PaperTestPlugin>> REGISTERED_PROVIDERS = new ArrayList<>();
++    private static Map<String, Integer> LOAD_ORDER = new HashMap<>();
++
++    static {
++        setup();
++    }
++
++    private static TestJavaPluginProvider setup(String identifier, String[] hard, String[] soft, String[] before) {
++        TestPluginConfiguration configuration = new TestPluginConfiguration(identifier);
++        configuration.setHardDependencies(List.of(hard));
++        configuration.setSoftDependencies(List.of(soft));
++        configuration.setLoadBefore(List.of(before));
++
++        TestJavaPluginProvider provider = new TestJavaPluginProvider(configuration);
++        REGISTERED_PROVIDERS.add(provider);
++        return provider;
++    }
++
++    /**
++     * Auto generated plugins, this uses a real dependency tree...
++     */
++    private static void setup() {
++        setup("RedAir", new String[]{}, new String[]{"NightShovel", "EmeraldFire"}, new String[]{"GreenShovel", "IronSpork", "BrightBlueShovel", "WireDoor"});
++        setup("BigGrass", new String[]{}, new String[]{"IronEarth", "RedAir"}, new String[]{"BlueFire"});
++        setup("BlueFire", new String[]{}, new String[]{}, new String[]{});
++        setup("BigPaper", new String[]{}, new String[]{"BlueFire"}, new String[]{});
++        setup("EmeraldSpork", new String[]{}, new String[]{}, new String[]{"GoldPaper", "YellowSnow"});
++        setup("GreenShovel", new String[]{}, new String[]{}, new String[]{});
++        setup("BrightBlueGrass", new String[]{"BigPaper"}, new String[]{"DarkSpork"}, new String[]{});
++        setup("GoldPaper", new String[]{}, new String[]{"BlueFire"}, new String[]{});
++        setup("GreenGlass", new String[]{}, new String[]{}, new String[]{});
++        setup("GoldNeptune", new String[]{}, new String[]{"GreenShovel", "GoldNeptuneVersioning"}, new String[]{});
++        setup("RedPaper", new String[]{}, new String[]{"GoldPaper", "GoldFire", "EmeraldGrass", "BlueFire", "CopperSpork", "YellowDoor", "OrangeClam", "BlueSponge", "GoldNeptune", "BrightBlueGrass", "DarkSpoon", "BigShovel", "GreenGlass", "IronGlass"}, new String[]{"IronPaper", "YellowFire"});
++        setup("YellowGrass", new String[]{}, new String[]{"RedAir"}, new String[]{});
++        setup("WireFire", new String[]{}, new String[]{"RedPaper", "WireGrass", "YellowSpork", "NightAir"}, new String[]{});
++        setup("OrangeNeptune", new String[]{}, new String[]{}, new String[]{});
++        setup("BigSpoon", new String[]{"YellowGrass", "GreenShovel"}, new String[]{"RedAir", "GoldNeptune", "BrightBlueGrass", "LightDoor", "LightSpork", "LightEarth", "NightDoor", "OrangeSpoon", "GoldSponge", "GoldDoor", "DarkPaper", "RedPaper", "GreenGlass", "IronGlass", "NightGlass", "BigGrass", "BlueFire", "YellowSpoon", "DiamondGrass", "DiamondShovel", "DarkSnow", "EmeraldGlass", "EmeraldSpoon", "LightFire", "WireGrass", "RedEarth", "WireFire"}, new String[]{});
++        setup("CopperSnow", new String[]{}, new String[]{"RedSnow", "OrangeFire", "WireAir", "GreenGlass", "NightSpork", "EmeraldPaper"}, new String[]{"BlueGrass"});
++        setup("BrightBluePaper", new String[]{}, new String[]{"GoldEarth", "BrightBlueSpoon", "CopperGlass", "LightSporkChat", "DarkAir", "LightEarth", "DiamondDoor", "YellowShovel", "BlueAir", "DarkShovel", "GoldPaper", "BlueFire", "GreenGlass", "YellowSpork", "BigGrass", "OrangePaper", "DarkPaper"}, new String[]{"WireShovel"});
++        setup("LightSponge", new String[]{}, new String[]{}, new String[]{});
++        setup("OrangeShovel", new String[]{}, new String[]{}, new String[]{});
++        setup("GoldGrass", new String[]{}, new String[]{"GreenGlass", "BlueFire"}, new String[]{});
++        setup("IronSponge", new String[]{}, new String[]{"DiamondEarth"}, new String[]{});
++        setup("EmeraldSnow", new String[]{}, new String[]{}, new String[]{});
++        setup("BlueSpoon", new String[]{"BigGrass"}, new String[]{"GreenGlass", "GoldPaper", "GreenShovel", "YellowClam"}, new String[]{});
++        setup("BigSpork", new String[]{}, new String[]{"BigPaper"}, new String[]{});
++        setup("BluePaper", new String[]{}, new String[]{"BigClam", "RedSpoon", "GreenFire", "WireSnow", "OrangeSnow", "BlueFire", "BrightBlueGrass", "YellowSpork", "GreenGlass"}, new String[]{});
++        setup("OrangeSpork", new String[]{}, new String[]{}, new String[]{});
++        setup("DiamondNeptune", new String[]{}, new String[]{"GreenGlass", "GreenShovel", "YellowNeptune"}, new String[]{});
++        setup("BigFire", new String[]{}, new String[]{"BlueFire", "BrightBlueDoor", "GreenGlass"}, new String[]{});
++        setup("NightNeptune", new String[]{}, new String[]{"BlueFire", "DarkGlass", "GoldPaper", "YellowNeptune", "BlueShovel"}, new String[]{});
++        setup("YellowEarth", new String[]{"RedAir"}, new String[]{}, new String[]{});
++        setup("DiamondClam", new String[]{}, new String[]{}, new String[]{});
++        setup("CopperAir", new String[]{}, new String[]{"BigPaper"}, new String[]{});
++        setup("NightSpoon", new String[]{"OrangeNeptune"}, new String[]{"BlueFire", "GreenGlass", "RedSpork", "GoldPaper", "BigShovel", "YellowSponge", "EmeraldSpork"}, new String[]{});
++        setup("GreenClam", new String[]{}, new String[]{"GreenShovel", "BrightBlueEarth", "BigSpoon", "RedPaper", "BlueFire", "GreenGlass", "WireFire", "GreenSnow"}, new String[]{});
++        setup("YellowPaper", new String[]{}, new String[]{}, new String[]{});
++        setup("WireGlass", new String[]{"YellowGrass"}, new String[]{"YellowGlass", "BigSpoon", "CopperSnow", "GreenGlass", "BlueEarth"}, new String[]{});
++        setup("BlueSpork", new String[]{}, new String[]{"BrightBlueGrass"}, new String[]{});
++        setup("CopperShovel", new String[]{}, new String[]{"GreenGlass"}, new String[]{});
++        setup("RedClam", new String[]{}, new String[]{}, new String[]{});
++        setup("EmeraldClam", new String[]{}, new String[]{"BlueFire"}, new String[]{});
++        setup("DarkClam", new String[]{}, new String[]{"GoldAir", "LightGlass"}, new String[]{});
++        setup("WireSpoon", new String[]{}, new String[]{"GoldPaper", "LightSnow"}, new String[]{});
++        setup("CopperNeptune", new String[]{}, new String[]{"GreenGlass", "BigGrass"}, new String[]{});
++        setup("RedNeptune", new String[]{}, new String[]{}, new String[]{});
++        setup("GreenAir", new String[]{}, new String[]{}, new String[]{});
++        setup("RedFire", new String[]{"BrightBlueGrass", "BigPaper"}, new String[]{"BlueFire", "GreenGlass", "BigGrass"}, new String[]{});
++    }
++
++    @Before
++    public void loadProviders() {
++        AtomicInteger currentLoad = new AtomicInteger();
++        ModernPluginLoadingStrategy<PaperTestPlugin> modernPluginLoadingStrategy = new ModernPluginLoadingStrategy<>(new ProviderLoader<>() {
++            @Override
++            public void applyContext(PluginProvider<PaperTestPlugin> provider, DependencyContext dependencyContext) {
++            }
++
++            @Override
++            public boolean load(PluginProvider<PaperTestPlugin> provider, PaperTestPlugin provided) {
++                LOAD_ORDER.put(provider.getConfiguration().getIdentifier(), currentLoad.getAndIncrement());
++                return false;
++            }
++        });
++
++        modernPluginLoadingStrategy.loadProviders(REGISTERED_PROVIDERS);
++    }
++
++    @Test
++    public void testDependencies() {
++        for (PluginProvider<PaperTestPlugin> provider : REGISTERED_PROVIDERS) {
++            PluginConfiguration pluginConfiguration = provider.getConfiguration();
++            String identifier = pluginConfiguration.getIdentifier();
++            Assert.assertTrue("Provider wasn't loaded! (%s)".formatted(identifier), LOAD_ORDER.containsKey(identifier));
++
++            int index = LOAD_ORDER.get(identifier);
++
++            // Hard dependencies should be loaded BEFORE
++            for (String hardDependency : pluginConfiguration.getHardDependencies()) {
++                Assert.assertTrue("Plugin (%s) is missing hard dependency (%s)".formatted(identifier, hardDependency), LOAD_ORDER.containsKey(hardDependency));
++
++                int dependencyIndex = LOAD_ORDER.get(hardDependency);
++                Assert.assertTrue("Plugin (%s) was not loaded BEFORE soft dependency. (%s)".formatted(identifier, hardDependency), index > dependencyIndex);
++            }
++
++            for (String softDependency : pluginConfiguration.getSoftDependencies()) {
++                if (!LOAD_ORDER.containsKey(softDependency)) {
++                    continue;
++                }
++
++                int dependencyIndex = LOAD_ORDER.get(softDependency);
++
++                Assert.assertTrue("Plugin (%s) was not loaded BEFORE soft dependency. (%s)".formatted(identifier, softDependency), index > dependencyIndex);
++            }
++
++            for (String loadBefore : pluginConfiguration.getLoadBefore()) {
++                if (!LOAD_ORDER.containsKey(loadBefore)) {
++                    continue;
++                }
++
++                int dependencyIndex = LOAD_ORDER.get(loadBefore);
++                Assert.assertTrue("Plugin (%s) was NOT loaded BEFORE loadbefore dependency. (%s)".formatted(identifier, loadBefore), index < dependencyIndex);
++            }
++        }
++    }
++}
+diff --git a/src/test/java/io/papermc/paper/plugin/PaperTestPlugin.java b/src/test/java/io/papermc/paper/plugin/PaperTestPlugin.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..03e33a36ed59efcaf0afa38e1a7632adc1d05d08
+--- /dev/null
++++ b/src/test/java/io/papermc/paper/plugin/PaperTestPlugin.java
+@@ -0,0 +1,146 @@
++package io.papermc.paper.plugin;
++
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
++import org.bukkit.Server;
++import org.bukkit.command.Command;
++import org.bukkit.command.CommandSender;
++import org.bukkit.configuration.file.FileConfiguration;
++import org.bukkit.generator.BiomeProvider;
++import org.bukkit.generator.ChunkGenerator;
++import org.bukkit.plugin.PluginBase;
++import org.bukkit.plugin.PluginDescriptionFile;
++import org.bukkit.plugin.PluginLoader;
++import org.bukkit.plugin.PluginLogger;
++
++import java.io.File;
++import java.io.InputStream;
++import java.util.List;
++
++public class PaperTestPlugin extends PluginBase {
++    private final String pluginName;
++    private boolean enabled = true;
++    private final PluginConfiguration configuration;
++
++    public PaperTestPlugin(String pluginName) {
++        this.pluginName = pluginName;
++        this.configuration = new TestPluginConfiguration(pluginName);
++    }
++
++    public PaperTestPlugin(PluginConfiguration configuration) {
++        this.configuration = configuration;
++        this.pluginName = configuration.getIdentifier();
++    }
++
++    @Override
++    public File getDataFolder() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public PluginDescriptionFile getDescription() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public PluginConfiguration getConfiguration() {
++        return this.configuration;
++    }
++
++    @Override
++    public FileConfiguration getConfig() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public InputStream getResource(String filename) {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public void saveConfig() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public void saveDefaultConfig() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public void saveResource(String resourcePath, boolean replace) {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public void reloadConfig() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public PluginLogger getLogger() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public PluginLoader getPluginLoader() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public Server getServer() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public boolean isEnabled() {
++        return enabled;
++    }
++
++    public void setEnabled(boolean enabled) {
++        this.enabled = enabled;
++    }
++
++    @Override
++    public void onDisable() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public void onLoad() {
++    }
++
++    @Override
++    public void onEnable() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public boolean isNaggable() {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public void setNaggable(boolean canNag) {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public ChunkGenerator getDefaultWorldGenerator(String worldName, String id) {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public BiomeProvider getDefaultBiomeProvider(String worldName, String id) {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++
++    @Override
++    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
++        throw new UnsupportedOperationException("Not supported.");
++    }
++}
+diff --git a/src/test/java/io/papermc/paper/plugin/PluginManagerTest.java b/src/test/java/io/papermc/paper/plugin/PluginManagerTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..726eba26470e62b0e94a91418512e242464800ae
+--- /dev/null
++++ b/src/test/java/io/papermc/paper/plugin/PluginManagerTest.java
+@@ -0,0 +1,75 @@
++package io.papermc.paper.plugin;
++
++import org.bukkit.Bukkit;
++import org.bukkit.event.Event;
++import org.bukkit.permissions.Permission;
++import org.bukkit.plugin.PluginManager;
++import org.bukkit.support.AbstractTestingBase;
++import org.junit.After;
++import org.junit.Test;
++
++import static org.hamcrest.MatcherAssert.assertThat;
++import static org.hamcrest.Matchers.*;
++
++public class PluginManagerTest extends AbstractTestingBase {
++
++    private static final PluginManager pm = Bukkit.getPluginManager();
++
++    @Test
++    public void testSyncSameThread() {
++        final Event event = new TestEvent(false);
++        pm.callEvent(event);
++    }
++
++    @Test
++    public void testRemovePermissionByNameLower() {
++        this.testRemovePermissionByName("lower");
++    }
++
++    @Test
++    public void testRemovePermissionByNameUpper() {
++        this.testRemovePermissionByName("UPPER");
++    }
++
++    @Test
++    public void testRemovePermissionByNameCamel() {
++        this.testRemovePermissionByName("CaMeL");
++    }
++
++    @Test
++    public void testRemovePermissionByPermissionLower() {
++        this.testRemovePermissionByPermission("lower");
++    }
++
++    @Test
++    public void testRemovePermissionByPermissionUpper() {
++        this.testRemovePermissionByPermission("UPPER");
++    }
++
++    @Test
++    public void testRemovePermissionByPermissionCamel() {
++        this.testRemovePermissionByPermission("CaMeL");
++    }
++
++    private void testRemovePermissionByName(final String name) {
++        final Permission perm = new Permission(name);
++        pm.addPermission(perm);
++        assertThat("Permission \"" + name + "\" was not added", pm.getPermission(name), is(perm));
++        pm.removePermission(name);
++        assertThat("Permission \"" + name + "\" was not removed", pm.getPermission(name), is(nullValue()));
++    }
++
++    private void testRemovePermissionByPermission(final String name) {
++        final Permission perm = new Permission(name);
++        pm.addPermission(perm);
++        assertThat("Permission \"" + name + "\" was not added", pm.getPermission(name), is(perm));
++        pm.removePermission(perm);
++        assertThat("Permission \"" + name + "\" was not removed", pm.getPermission(name), is(nullValue()));
++    }
++
++    @After
++    public void tearDown() {
++        pm.clearPlugins();
++        assertThat(pm.getPermissions(), is(empty()));
++    }
++}
+diff --git a/src/test/java/io/papermc/paper/plugin/SyntheticEventTest.java b/src/test/java/io/papermc/paper/plugin/SyntheticEventTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..51c08740edffd152c8e2b6d3676ff7f1ce6090c6
+--- /dev/null
++++ b/src/test/java/io/papermc/paper/plugin/SyntheticEventTest.java
+@@ -0,0 +1,42 @@
++package io.papermc.paper.plugin;
++
++import io.papermc.paper.plugin.manager.PaperPluginManagerImpl;
++import org.bukkit.Bukkit;
++import org.bukkit.event.Event;
++import org.bukkit.event.EventHandler;
++import org.bukkit.event.Listener;
++import org.junit.Assert;
++import org.junit.Test;
++
++public class SyntheticEventTest {
++
++    @Test
++    public void test() {
++        PaperTestPlugin paperTestPlugin = new PaperTestPlugin("synthetictest");
++        PaperPluginManagerImpl paperPluginManager = new PaperPluginManagerImpl(Bukkit.getServer(), null, null);
++
++        TestEvent event = new TestEvent(false);
++        Impl impl = new Impl();
++
++        paperPluginManager.registerEvents(impl, paperTestPlugin);
++        paperPluginManager.callEvent(event);
++
++        Assert.assertEquals(1, impl.callCount);
++    }
++
++    public abstract static class Base<E extends Event> implements Listener {
++        int callCount = 0;
++
++        public void accept(E evt) {
++            callCount++;
++        }
++    }
++
++    public static class Impl extends Base<TestEvent> {
++        @Override
++        @EventHandler
++        public void accept(TestEvent evt) {
++            super.accept(evt);
++        }
++    }
++}
+diff --git a/src/test/java/io/papermc/paper/plugin/TestEvent.java b/src/test/java/io/papermc/paper/plugin/TestEvent.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..04903794a8ee4dd73162ae240862ff6dc4cb4e24
+--- /dev/null
++++ b/src/test/java/io/papermc/paper/plugin/TestEvent.java
+@@ -0,0 +1,22 @@
++package io.papermc.paper.plugin;
++
++
++import org.bukkit.event.Event;
++import org.bukkit.event.HandlerList;
++
++public class TestEvent extends Event {
++    private static final HandlerList handlers = new HandlerList();
++
++    public TestEvent(boolean async) {
++        super(async);
++    }
++
++    @Override
++    public HandlerList getHandlers() {
++        return handlers;
++    }
++
++    public static HandlerList getHandlerList() {
++        return handlers;
++    }
++}
+diff --git a/src/test/java/io/papermc/paper/plugin/TestJavaPluginProvider.java b/src/test/java/io/papermc/paper/plugin/TestJavaPluginProvider.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..50141d11ceb08c382c989f61c8762629274e7a01
+--- /dev/null
++++ b/src/test/java/io/papermc/paper/plugin/TestJavaPluginProvider.java
+@@ -0,0 +1,43 @@
++package io.papermc.paper.plugin;
++
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
++import io.papermc.paper.plugin.provider.PluginProvider;
++import org.jetbrains.annotations.NotNull;
++
++import java.nio.file.Path;
++import java.util.jar.JarFile;
++import java.util.logging.Logger;
++
++public class TestJavaPluginProvider implements PluginProvider<PaperTestPlugin> {
++
++    private final TestPluginConfiguration testPluginConfiguration;
++
++    public TestJavaPluginProvider(TestPluginConfiguration testPluginConfiguration) {
++        this.testPluginConfiguration = testPluginConfiguration;
++    }
++
++    @Override
++    public @NotNull Path getSource() {
++        return Path.of("dummy");
++    }
++
++    @Override
++    public JarFile file() {
++        throw new UnsupportedOperationException();
++    }
++
++    @Override
++    public PaperTestPlugin createInstance() {
++        return new PaperTestPlugin(this.testPluginConfiguration);
++    }
++
++    @Override
++    public PluginConfiguration getConfiguration() {
++        return this.testPluginConfiguration;
++    }
++
++    @Override
++    public Logger getLogger() {
++        return Logger.getLogger("TestPlugin");
++    }
++}
+diff --git a/src/test/java/io/papermc/paper/plugin/TestPluginConfiguration.java b/src/test/java/io/papermc/paper/plugin/TestPluginConfiguration.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4d0eda6d9fe9e5b457a39efd4a37039e268d4c0
+--- /dev/null
++++ b/src/test/java/io/papermc/paper/plugin/TestPluginConfiguration.java
+@@ -0,0 +1,114 @@
++package io.papermc.paper.plugin;
++
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
++import org.bukkit.permissions.Permission;
++import org.bukkit.permissions.PermissionDefault;
++import org.bukkit.plugin.PluginLoadOrder;
++import org.jetbrains.annotations.NotNull;
++import org.jetbrains.annotations.Nullable;
++
++import java.util.List;
++
++public class TestPluginConfiguration implements PluginConfiguration {
++
++    private final String identifier;
++    private List<String> hardDependencies = List.of();
++    private List<String> softDependencies = List.of();
++    private List<String> loadBefore = List.of();
++
++    public TestPluginConfiguration(String identifier) {
++        this.identifier = identifier;
++    }
++
++    @Override
++    public @NotNull String getIdentifier() {
++        return this.identifier;
++    }
++
++    @Override
++    public @NotNull String getMain() {
++        return "null";
++    }
++
++    @Override
++    public @NotNull PluginLoadOrder getLoadPhase() {
++        return PluginLoadOrder.POSTWORLD;
++    }
++
++    @Override
++    public @NotNull String getVersion() {
++        return "1.0";
++    }
++
++    @Override
++    public @NotNull String getLoggingPrefix() {
++        return this.identifier;
++    }
++
++    public void setHardDependencies(List<String> hardDependencies) {
++        this.hardDependencies = hardDependencies;
++    }
++
++    @Override
++    public @NotNull List<String> getHardDependencies() {
++        return this.hardDependencies;
++    }
++
++    public void setSoftDependencies(List<String> softDependencies) {
++        this.softDependencies = softDependencies;
++    }
++
++    @Override
++    public @NotNull List<String> getSoftDependencies() {
++        return this.softDependencies;
++    }
++
++    public void setLoadBefore(List<String> loadBefore) {
++        this.loadBefore = loadBefore;
++    }
++
++    @Override
++    public @NotNull List<String> getLoadBefore() {
++        return this.loadBefore;
++    }
++
++    @Override
++    public @NotNull List<String> getProvides() {
++        return List.of();
++    }
++
++    @Override
++    public @NotNull List<String> getAuthors() {
++        return List.of();
++    }
++
++    @Override
++    public @NotNull List<String> getContributors() {
++        return List.of();
++    }
++
++    @Override
++    public @Nullable String getDescription() {
++        return "null";
++    }
++
++    @Override
++    public @Nullable String getWebsite() {
++        return "null";
++    }
++
++    @Override
++    public @NotNull List<Permission> getPermissions() {
++        return List.of();
++    }
++
++    @Override
++    public @NotNull PermissionDefault getDefaultPermission() {
++        return PermissionDefault.TRUE;
++    }
++
++    @Override
++    public @NotNull String getApiVersion() {
++        return "null";
++    }
++}
+diff --git a/src/test/java/org/bukkit/support/DummyServer.java b/src/test/java/org/bukkit/support/DummyServer.java
+index 2ddceb709291d3bd713621ffa4020c02ec26bb21..53bf98c512cc39270be70ca579ecbf5da744ddf4 100644
+--- a/src/test/java/org/bukkit/support/DummyServer.java
++++ b/src/test/java/org/bukkit/support/DummyServer.java
+@@ -106,6 +106,17 @@ public final class DummyServer implements InvocationHandler {
+                         }
+                     }
+             );
++            // Paper start
++            methods.put(
++                Server.class.getMethod("isPrimaryThread"),
++                new MethodHandler() {
++                    @Override
++                    public Object handle(DummyServer server, Object[] args) {
++                        return Thread.currentThread().equals(server.creatingThread);
++                    }
++                }
++            );
++            // Paper end
+             // Paper start - modeled off of TestServer in the API tests module
+             methods.put(
+                 Server.class.getMethod("getPluginManager"),
+@@ -119,7 +130,7 @@ public final class DummyServer implements InvocationHandler {
+             DummyServer server = new DummyServer();
+             Server instance = Proxy.getProxyClass(Server.class.getClassLoader(), Server.class).asSubclass(Server.class).getConstructor(InvocationHandler.class).newInstance(server);
+             Bukkit.setServer(instance);
+-            server.pluginManager = new org.bukkit.plugin.SimplePluginManager(instance, new org.bukkit.command.SimpleCommandMap(instance));
++            server.pluginManager = new io.papermc.paper.plugin.manager.PaperPluginManagerImpl(instance, new org.bukkit.command.SimpleCommandMap(instance), null);
+             // Paper end
+         } catch (Throwable t) {
+             throw new Error(t);
+@@ -131,6 +142,7 @@ public final class DummyServer implements InvocationHandler {
+     private DummyServer() {};
+ 
+     private org.bukkit.plugin.PluginManager pluginManager; // Paper
++    private Thread creatingThread = Thread.currentThread(); // Paper
+     @Override
+     public Object invoke(Object proxy, Method method, Object[] args) {
+         MethodHandler handler = DummyServer.methods.get(method);
