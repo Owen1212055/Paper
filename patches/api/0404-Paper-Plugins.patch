@@ -1043,23 +1043,21 @@ index 0000000000000000000000000000000000000000..90171c7be6fa05ce69398f593265368a
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoaderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoaderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..82d387b55a25e5418c763b97b77f5bec93f86e41
+index 0000000000000000000000000000000000000000..3a631893424c6ef6da10483b876af999b08fc6a2
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoaderStorage.java
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,76 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
-+import io.papermc.paper.plugin.configuration.PluginConfiguration;
-+import org.bukkit.Bukkit;
-+import org.bukkit.plugin.PluginManager;
 +import org.jetbrains.annotations.ApiStatus;
-+import org.jetbrains.annotations.Nullable;
++import org.jetbrains.annotations.NotNull;
 +
 +import java.util.HashMap;
 +import java.util.List;
 +import java.util.Map;
 +import java.util.concurrent.CopyOnWriteArrayList;
 +import java.util.concurrent.locks.ReentrantReadWriteLock;
++import java.util.function.Function;
 +
 +/**
 + * This is used for connecting multiple classloaders.
@@ -1067,18 +1065,16 @@ index 0000000000000000000000000000000000000000..82d387b55a25e5418c763b97b77f5bec
 +@ApiStatus.Internal
 +public final class PaperPluginClassLoaderStorage {
 +
++    public static final PaperPluginClassLoaderStorage INSTANCE = new PaperPluginClassLoaderStorage();
 +    private static final boolean DISABLE_CLASS_PRIORITIZATION = Boolean.getBoolean("Paper.DisableClassPrioritization");
-+
++    public final List<ConfiguredPluginClassLoader> classLoaders = new CopyOnWriteArrayList<>();
 +    private final Map<String, ReentrantReadWriteLock> classLoadLock = new HashMap<>();
 +    private final Map<String, Integer> classLoadLockCount = new HashMap<>();
-+    public final List<ConfiguredPluginClassLoader> classLoaders = new CopyOnWriteArrayList<>();
-+
-+    public static final PaperPluginClassLoaderStorage INSTANCE = new PaperPluginClassLoaderStorage();
 +
 +    public PaperPluginClassLoaderStorage() {
 +    }
 +
-+    public Class<?> getClassByName(String name, boolean resolve, PluginConfiguration pluginConfiguration, @Nullable ConfiguredPluginClassLoader requester) {
++    public Class<?> getClassByName(String name, boolean resolve, Function<ConfiguredPluginClassLoader, Boolean> checkLibraries, @NotNull ConfiguredPluginClassLoader requester) {
 +        // make MT safe
 +        java.util.concurrent.locks.ReentrantReadWriteLock lock;
 +        synchronized (this.classLoadLock) {
@@ -1088,16 +1084,15 @@ index 0000000000000000000000000000000000000000..82d387b55a25e5418c763b97b77f5bec
 +        lock.writeLock().lock();
 +
 +        try {
-+            PluginManager manager = Bukkit.getPluginManager();
-+            if (!DISABLE_CLASS_PRIORITIZATION && requester != null) {
++            if (!DISABLE_CLASS_PRIORITIZATION) {
 +                try {
-+                    return requester.loadClass(name, false, false, manager.isTransitiveDependency(pluginConfiguration, requester.getConfiguration()));
++                    return requester.loadClass(name, false, false, checkLibraries.apply(requester));
 +                } catch (ClassNotFoundException cnfe) {
 +                }
 +            }
 +            for (ConfiguredPluginClassLoader loader : this.classLoaders) {
 +                try {
-+                    return loader.loadClass(name, resolve, false, manager.isTransitiveDependency(pluginConfiguration, loader.getConfiguration()));
++                    return loader.loadClass(name, resolve, false, checkLibraries.apply(loader));
 +                } catch (ClassNotFoundException cnfe) {
 +                }
 +            }
@@ -1953,7 +1948,7 @@ index 6d634b0ea813ccb19f1562a7d0e5a59cea4eab21..4eec9316e4447701732c944fa84c64a0
  
      private final Logger logger;
 diff --git a/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java b/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java
-index cb3c25ef46b279ffdde87f47f729eb8aa7549c1c..20630b5f28e56cc07bcbcac803efd469bd18feb4 100644
+index cb3c25ef46b279ffdde87f47f729eb8aa7549c1c..40a137f75a0d9c0baffcebde1c33aedb68b9ff99 100644
 --- a/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java
 +++ b/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java
 @@ -20,18 +20,20 @@ import java.util.jar.JarEntry;
@@ -2025,16 +2020,21 @@ index cb3c25ef46b279ffdde87f47f729eb8aa7549c1c..20630b5f28e56cc07bcbcac803efd469
      // Paper end
  
      @Override
-@@ -144,7 +160,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -144,7 +160,12 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
  
          if (checkGlobal) {
              // This ignores the libraries of other plugins, unless they are transitive dependencies.
 -            Class<?> result = loader.getClassByName(name, resolve, description, this);  // Paper - prioritize self
-+            Class<?> result = io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoaderStorage.INSTANCE.getClassByName(name, resolve, description, this);  // Paper - prioritize self
++            // Paper start
++            Class<?> result = io.papermc.paper.plugin.provider.service.classloader.PaperPluginClassLoaderStorage.INSTANCE.getClassByName(name, resolve, (library) -> {
++                // This classloader is only used when a plugin manager is active. So use the default dependency context.
++                return Bukkit.getServer().getPluginManager().isTransitiveDependency(this.description, library.getConfiguration());
++            }, this);
++            // Paper end
  
              if (result != null) {
                  // If the class was loaded from a library instead of a PluginClassLoader, we can assume that its associated plugin is a transitive dependency and can therefore skip this check.
-@@ -153,18 +169,18 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -153,18 +174,18 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
  
                      if (provider != description
                              && !seenIllegalAccess.contains(provider.getName())
@@ -2056,7 +2056,7 @@ index cb3c25ef46b279ffdde87f47f729eb8aa7549c1c..20630b5f28e56cc07bcbcac803efd469
                          }
                          // Paper end
                      }
-@@ -197,7 +213,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -197,7 +218,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
                      throw new ClassNotFoundException(name, ex);
                  }
  
@@ -2065,7 +2065,7 @@ index cb3c25ef46b279ffdde87f47f729eb8aa7549c1c..20630b5f28e56cc07bcbcac803efd469
  
                  int dot = name.lastIndexOf('.');
                  if (dot != -1) {
-@@ -227,7 +243,6 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -227,7 +248,6 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
                  result = super.findClass(name);
              }
  
@@ -2073,7 +2073,7 @@ index cb3c25ef46b279ffdde87f47f729eb8aa7549c1c..20630b5f28e56cc07bcbcac803efd469
              classes.put(name, result);
          }
  
-@@ -237,6 +252,11 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -237,6 +257,11 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
      @Override
      public void close() throws IOException {
          try {
@@ -2085,7 +2085,7 @@ index cb3c25ef46b279ffdde87f47f729eb8aa7549c1c..20630b5f28e56cc07bcbcac803efd469
              super.close();
          } finally {
              jar.close();
-@@ -248,7 +268,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -248,7 +273,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
          return classes.values();
      }
  
@@ -2094,7 +2094,7 @@ index cb3c25ef46b279ffdde87f47f729eb8aa7549c1c..20630b5f28e56cc07bcbcac803efd469
          Preconditions.checkArgument(javaPlugin != null, "Initializing plugin cannot be null");
          Preconditions.checkArgument(javaPlugin.getClass().getClassLoader() == this, "Cannot initialize plugin outside of this class loader");
          if (this.plugin != null || this.pluginInit != null) {
-@@ -259,7 +279,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -259,7 +284,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
          this.pluginInit = javaPlugin;
  
          javaPlugin.logger = this.logger; // Paper - set logger
@@ -2103,7 +2103,7 @@ index cb3c25ef46b279ffdde87f47f729eb8aa7549c1c..20630b5f28e56cc07bcbcac803efd469
      }
  
      // Paper start
-@@ -272,5 +292,19 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -272,5 +297,19 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
                     ", url=" + file +
                     '}';
      }

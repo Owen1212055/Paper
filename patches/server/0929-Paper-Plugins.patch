@@ -18,7 +18,6 @@ These patches (will) be merged into this as this PR removes the usages of the fi
 - Automatically disable plugins that fail to load (Aikar <aikar@aikar.co>)
 - Add an asterisk to legacy API plugins (Phoenix616 <max@themoep.de>)
 - Make /plugins list alphabetical (BillyGalbreath <Blake.Galbreath@GMail.com>)
-- Also load resources from LibraryLoader (Nick Hensel <nickhensel25@icloud.com>)
 
 PATCHES TO MODIFY:
 - Add command line option to load extra plugin jars not in the plugins folder (Jason Penilla <11360596+jpenilla@users.noreply.github.com>)
@@ -2397,10 +2396,10 @@ index 0000000000000000000000000000000000000000..97fe93ef816f9b79ee1f0bf838587325
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..66a4e7b012ae571e7020957645b1b4f82ce925bf
+index 0000000000000000000000000000000000000000..53404a4943cde349c4e8f48eb522aa416c585aed
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
-@@ -0,0 +1,181 @@
+@@ -0,0 +1,183 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
 +import io.papermc.paper.plugin.DependencyContext;
@@ -2507,7 +2506,9 @@ index 0000000000000000000000000000000000000000..66a4e7b012ae571e7020957645b1b4f8
 +
 +        if (checkGlobal) {
 +            // This ignores the libraries of other plugins, unless they are transitive dependencies.
-+            Class<?> result = this.loader.getClassByName(name, resolve, this.configuration, this);
++            Class<?> result = this.loader.getClassByName(name, resolve, (library) -> {
++                return this.dependencyContext.isTransitiveDependency(this.configuration, library.getConfiguration()); // Use stored dependency context
++            }, this);
 +
 +            if (result != null) {
 +                // If the class was loaded from a library instead of a PluginClassLoader, we can assume that its associated plugin is a transitive dependency and can therefore skip this check.
@@ -3497,7 +3498,7 @@ index 0000000000000000000000000000000000000000..fb9f96a018d32dfe8ec9df16ee833bf6
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/LegacyPluginLoadingStrategy.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/LegacyPluginLoadingStrategy.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..b38b4cf226181afd750da3f3a843061c76d0bf1e
+index 0000000000000000000000000000000000000000..bd94ac852599e3ab9839a2d6e73517d8319b08d1
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/LegacyPluginLoadingStrategy.java
 @@ -0,0 +1,253 @@
@@ -3560,7 +3561,7 @@ index 0000000000000000000000000000000000000000..b38b4cf226181afd750da3f3a843061c
 +                ));
 +            }
 +
-+            for (String provided : configuration.getProvides()) {
++            for (String provided : configuration.getProvidedPlugins()) {
 +                PluginProvider<T> pluginProvider = providersToLoad.get(provided);
 +
 +                if (pluginProvider != null) {
@@ -3696,7 +3697,7 @@ index 0000000000000000000000000000000000000000..b38b4cf226181afd750da3f3a843061c
 +
 +                        if (this.onLoad.load(file, loadedPlugin)) {
 +                            loadedPlugins.add(file.getConfiguration().getIdentifier());
-+                            loadedPlugins.addAll(file.getConfiguration().getProvides());
++                            loadedPlugins.addAll(file.getConfiguration().getProvidedPlugins());
 +                            javapluginsLoaded.add(loadedPlugin);
 +                        }
 +
@@ -3727,7 +3728,7 @@ index 0000000000000000000000000000000000000000..b38b4cf226181afd750da3f3a843061c
 +
 +                            if (this.onLoad.load(file, loadedPlugin)) {
 +                                loadedPlugins.add(file.getConfiguration().getIdentifier());
-+                                loadedPlugins.addAll(file.getConfiguration().getProvides());
++                                loadedPlugins.addAll(file.getConfiguration().getProvidedPlugins());
 +                                javapluginsLoaded.add(loadedPlugin);
 +                            }
 +                            break;
