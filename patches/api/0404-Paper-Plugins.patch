@@ -5,7 +5,7 @@ Subject: [PATCH] Paper Plugins
 
 
 diff --git a/build.gradle.kts b/build.gradle.kts
-index 0660174a8c543b3e8ef317cfabcda88a6a53d844..9330ca21acf6f6a0e4caa6cc619d760aafc3a605 100644
+index 9f5694204091e23c4771657127a06f98e27ad8f1..44f4d14f67aef9b8c68a9b98b9480302aa35f3d3 100644
 --- a/build.gradle.kts
 +++ b/build.gradle.kts
 @@ -46,7 +46,7 @@ dependencies {
@@ -1492,10 +1492,10 @@ index 0d1b20f2b5580ea5505ccc2f003925dbcee67199..97d498cf3c3545e2835fe0d4c5e4fe9f
 +    // Paper end
  }
 diff --git a/src/main/java/org/bukkit/plugin/SimplePluginManager.java b/src/main/java/org/bukkit/plugin/SimplePluginManager.java
-index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11f9c86516 100644
+index 9db611841b73fed8dc8a71f4d7fdef95af3cf89d..eca25444ef0deffd08eed5376a6b31a1dc1315b4 100644
 --- a/src/main/java/org/bukkit/plugin/SimplePluginManager.java
 +++ b/src/main/java/org/bukkit/plugin/SimplePluginManager.java
-@@ -41,7 +41,11 @@ import org.jetbrains.annotations.Nullable;
+@@ -42,7 +42,11 @@ import org.jetbrains.annotations.Nullable;
  
  /**
   * Handles all plugin management from the Server
@@ -1507,7 +1507,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
  public final class SimplePluginManager implements PluginManager {
      private final Server server;
      private final Map<Pattern, PluginLoader> fileAssociations = new HashMap<Pattern, PluginLoader>();
-@@ -50,10 +54,13 @@ public final class SimplePluginManager implements PluginManager {
+@@ -51,10 +55,13 @@ public final class SimplePluginManager implements PluginManager {
      private MutableGraph<String> dependencyGraph = GraphBuilder.directed().build();
      private File updateDirectory;
      private final SimpleCommandMap commandMap;
@@ -1525,7 +1525,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
      private boolean useTimings = false;
  
      public SimplePluginManager(@NotNull Server instance, @NotNull SimpleCommandMap commandMap) {
-@@ -115,6 +122,18 @@ public final class SimplePluginManager implements PluginManager {
+@@ -116,6 +123,18 @@ public final class SimplePluginManager implements PluginManager {
      }
      @NotNull
      public Plugin[] loadPlugins(final @NotNull File directory, final @NotNull List<File> extraPluginJars) {
@@ -1544,10 +1544,11 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          // Paper end
          Preconditions.checkArgument(directory != null, "Directory cannot be null");
          Preconditions.checkArgument(directory.isDirectory(), "Directory must be a directory");
-@@ -393,6 +412,13 @@ public final class SimplePluginManager implements PluginManager {
-     @Override
+@@ -395,6 +414,15 @@ public final class SimplePluginManager implements PluginManager {
      @Nullable
      public synchronized Plugin loadPlugin(@NotNull File file) throws InvalidPluginException, UnknownDependencyException {
+         Preconditions.checkArgument(file != null, "File cannot be null");
++        // Paper start
 +        if (true) {
 +            try {
 +                return this.paperPluginManager.loadPlugin(file);
@@ -1555,10 +1556,11 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
 +                return null;
 +            }
 +        }
-         Preconditions.checkArgument(file != null, "File cannot be null");
++        // Paper end
  
          file = checkUpdate(file); // Paper - update the reference in case checkUpdate renamed it
-@@ -484,12 +510,14 @@ public final class SimplePluginManager implements PluginManager {
+ 
+@@ -490,12 +518,14 @@ public final class SimplePluginManager implements PluginManager {
      @Override
      @Nullable
      public synchronized Plugin getPlugin(@NotNull String name) {
@@ -1573,7 +1575,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          return plugins.toArray(new Plugin[plugins.size()]);
      }
  
-@@ -503,6 +531,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -509,6 +539,7 @@ public final class SimplePluginManager implements PluginManager {
       */
      @Override
      public boolean isPluginEnabled(@NotNull String name) {
@@ -1581,7 +1583,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          Plugin plugin = getPlugin(name);
  
          return isPluginEnabled(plugin);
-@@ -516,6 +545,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -522,6 +553,7 @@ public final class SimplePluginManager implements PluginManager {
       */
      @Override
      public synchronized boolean isPluginEnabled(@Nullable Plugin plugin) { // Paper - synchronize
@@ -1589,7 +1591,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          if ((plugin != null) && (plugins.contains(plugin))) {
              return plugin.isEnabled();
          } else {
-@@ -525,6 +555,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -531,6 +563,7 @@ public final class SimplePluginManager implements PluginManager {
  
      @Override
      public synchronized void enablePlugin(@NotNull final Plugin plugin) { // Paper - synchronize
@@ -1597,7 +1599,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          if (!plugin.isEnabled()) {
              List<Command> pluginCommands = PluginCommandYamlParser.parse(plugin);
  
-@@ -545,6 +576,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -551,6 +584,7 @@ public final class SimplePluginManager implements PluginManager {
  
      @Override
      public void disablePlugins() {
@@ -1605,7 +1607,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          Plugin[] plugins = getPlugins();
          for (int i = plugins.length - 1; i >= 0; i--) {
              disablePlugin(plugins[i]);
-@@ -568,6 +600,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -574,6 +608,7 @@ public final class SimplePluginManager implements PluginManager {
  
      @Override
      public synchronized void disablePlugin(@NotNull final Plugin plugin) { // Paper - synchronize
@@ -1613,7 +1615,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          if (plugin.isEnabled()) {
              try {
                  plugin.getPluginLoader().disablePlugin(plugin);
-@@ -624,6 +657,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -630,6 +665,7 @@ public final class SimplePluginManager implements PluginManager {
  
      @Override
      public void clearPlugins() {
@@ -1621,7 +1623,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          synchronized (this) {
              disablePlugins();
              plugins.clear();
-@@ -645,6 +679,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -651,6 +687,7 @@ public final class SimplePluginManager implements PluginManager {
       */
      @Override
      public void callEvent(@NotNull Event event) {
@@ -1629,7 +1631,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          // Paper - replace callEvent by merging to below method
          if (event.isAsynchronous() && server.isPrimaryThread()) {
              throw new IllegalStateException(event.getEventName() + " may only be triggered asynchronously.");
-@@ -689,6 +724,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -695,6 +732,7 @@ public final class SimplePluginManager implements PluginManager {
  
      @Override
      public void registerEvents(@NotNull Listener listener, @NotNull Plugin plugin) {
@@ -1637,23 +1639,15 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          if (!plugin.isEnabled()) {
              throw new IllegalPluginAccessException("Plugin attempted to register " + listener + " while not enabled");
          }
-@@ -701,6 +737,7 @@ public final class SimplePluginManager implements PluginManager {
- 
-     @Override
-     public void registerEvent(@NotNull Class<? extends Event> event, @NotNull Listener listener, @NotNull EventPriority priority, @NotNull EventExecutor executor, @NotNull Plugin plugin) {
-+        if (true) {this.paperPluginManager.registerEvent(event, listener, priority, executor, plugin); return;} // Paper
-         registerEvent(event, listener, priority, executor, plugin, false);
-     }
- 
-@@ -718,6 +755,7 @@ public final class SimplePluginManager implements PluginManager {
-      */
-     @Override
-     public void registerEvent(@NotNull Class<? extends Event> event, @NotNull Listener listener, @NotNull EventPriority priority, @NotNull EventExecutor executor, @NotNull Plugin plugin, boolean ignoreCancelled) {
-+        if (true) {this.paperPluginManager.registerEvent(event, listener, priority, executor, plugin, ignoreCancelled); return;} // Paper
-         Preconditions.checkArgument(listener != null, "Listener cannot be null");
+@@ -728,6 +766,7 @@ public final class SimplePluginManager implements PluginManager {
          Preconditions.checkArgument(priority != null, "Priority cannot be null");
          Preconditions.checkArgument(executor != null, "Executor cannot be null");
-@@ -765,16 +803,19 @@ public final class SimplePluginManager implements PluginManager {
+         Preconditions.checkArgument(plugin != null, "Plugin cannot be null");
++        if (true) {this.paperPluginManager.registerEvent(event, listener, priority, executor, plugin); return;} // Paper
+ 
+         if (!plugin.isEnabled()) {
+             throw new IllegalPluginAccessException("Plugin attempted to register " + event + " while not enabled");
+@@ -776,16 +815,19 @@ public final class SimplePluginManager implements PluginManager {
      @Override
      @Nullable
      public Permission getPermission(@NotNull String name) {
@@ -1673,7 +1667,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          String name = perm.getName().toLowerCase(java.util.Locale.ENGLISH);
  
          if (permissions.containsKey(name)) {
-@@ -788,21 +829,25 @@ public final class SimplePluginManager implements PluginManager {
+@@ -799,21 +841,25 @@ public final class SimplePluginManager implements PluginManager {
      @Override
      @NotNull
      public Set<Permission> getDefaultPermissions(boolean op) {
@@ -1699,7 +1693,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          if (perm != null && permissions.containsKey(perm.getName().toLowerCase(java.util.Locale.ENGLISH))) {
              defaultPerms.get(true).remove(perm);
              defaultPerms.get(false).remove(perm);
-@@ -842,6 +887,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -853,6 +899,7 @@ public final class SimplePluginManager implements PluginManager {
  
      @Override
      public void subscribeToPermission(@NotNull String permission, @NotNull Permissible permissible) {
@@ -1707,7 +1701,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          String name = permission.toLowerCase(java.util.Locale.ENGLISH);
          Map<Permissible, Boolean> map = permSubs.get(name);
  
-@@ -855,6 +901,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -866,6 +913,7 @@ public final class SimplePluginManager implements PluginManager {
  
      @Override
      public void unsubscribeFromPermission(@NotNull String permission, @NotNull Permissible permissible) {
@@ -1715,7 +1709,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          String name = permission.toLowerCase(java.util.Locale.ENGLISH);
          Map<Permissible, Boolean> map = permSubs.get(name);
  
-@@ -870,6 +917,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -881,6 +929,7 @@ public final class SimplePluginManager implements PluginManager {
      @Override
      @NotNull
      public Set<Permissible> getPermissionSubscriptions(@NotNull String permission) {
@@ -1723,7 +1717,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          String name = permission.toLowerCase(java.util.Locale.ENGLISH);
          Map<Permissible, Boolean> map = permSubs.get(name);
  
-@@ -882,6 +930,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -893,6 +942,7 @@ public final class SimplePluginManager implements PluginManager {
  
      @Override
      public void subscribeToDefaultPerms(boolean op, @NotNull Permissible permissible) {
@@ -1731,7 +1725,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          Map<Permissible, Boolean> map = defSubs.get(op);
  
          if (map == null) {
-@@ -894,6 +943,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -905,6 +955,7 @@ public final class SimplePluginManager implements PluginManager {
  
      @Override
      public void unsubscribeFromDefaultPerms(boolean op, @NotNull Permissible permissible) {
@@ -1739,7 +1733,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          Map<Permissible, Boolean> map = defSubs.get(op);
  
          if (map != null) {
-@@ -908,6 +958,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -919,6 +970,7 @@ public final class SimplePluginManager implements PluginManager {
      @Override
      @NotNull
      public Set<Permissible> getDefaultPermSubscriptions(boolean op) {
@@ -1747,7 +1741,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          Map<Permissible, Boolean> map = defSubs.get(op);
  
          if (map == null) {
-@@ -920,6 +971,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -931,6 +983,7 @@ public final class SimplePluginManager implements PluginManager {
      @Override
      @NotNull
      public Set<Permission> getPermissions() {
@@ -1755,7 +1749,7 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          return new HashSet<Permission>(permissions.values());
      }
  
-@@ -943,6 +995,7 @@ public final class SimplePluginManager implements PluginManager {
+@@ -954,6 +1007,7 @@ public final class SimplePluginManager implements PluginManager {
  
      @Override
      public boolean useTimings() {
@@ -1763,24 +1757,22 @@ index ed07f5820281b139739f673fa4e25171de81b894..1462d55789486f22ea1eaa9a41063f11
          return co.aikar.timings.Timings.isTimingsEnabled(); // Spigot
      }
  
-@@ -956,11 +1009,28 @@ public final class SimplePluginManager implements PluginManager {
-     }
+@@ -968,10 +1022,25 @@ public final class SimplePluginManager implements PluginManager {
  
      // Paper start
-+
      public void clearPermissions() {
 +        if (true) {this.paperPluginManager.clearPermissions(); return;} // Paper
          permissions.clear();
          defaultPerms.get(true).clear();
          defaultPerms.get(false).clear();
      }
-     // Paper end
-+    // Paper start
+-    // Paper end
+ 
 +    @Override
 +    public boolean isTransitiveDependency(io.papermc.paper.plugin.configuration.PluginConfiguration pluginConfiguration, io.papermc.paper.plugin.configuration.PluginConfiguration dependencyConfig) {
 +        return this.paperPluginManager.isTransitiveDependency(pluginConfiguration, dependencyConfig);
 +    }
- 
++
 +    @Override
 +    public void overridePermissionManager(@Nullable Plugin plugin, @Nullable io.papermc.paper.plugin.PermissionManager permissionManager) {
 +        this.paperPluginManager.overridePermissionManager(plugin, permissionManager);
@@ -1955,7 +1947,7 @@ index 6d634b0ea813ccb19f1562a7d0e5a59cea4eab21..4eec9316e4447701732c944fa84c64a0
  
      private final Logger logger;
 diff --git a/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java b/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java
-index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a562b798c 100644
+index cb3c25ef46b279ffdde87f47f729eb8aa7549c1c..20630b5f28e56cc07bcbcac803efd469bd18feb4 100644
 --- a/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java
 +++ b/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java
 @@ -20,18 +20,20 @@ import java.util.jar.JarEntry;
@@ -2005,10 +1997,11 @@ index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a
          this.description = description;
          this.dataFolder = dataFolder;
          this.file = file;
-@@ -97,6 +98,21 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
-     public Enumeration<URL> getResources(String name) throws IOException {
-         return findResources(name);
+@@ -117,6 +118,21 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+             list.add(enumeration.nextElement());
+         }
      }
++
 +    // Paper start
 +    @Override
 +    public Class<?> loadClass(@NotNull String name, boolean resolve, boolean checkGlobal, boolean checkLibraries) throws ClassNotFoundException {
@@ -2023,11 +2016,10 @@ index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a
 +    public void init(JavaPlugin plugin) {
 +        this.initialize(plugin);
 +    }
-+    // Paper end
+     // Paper end
  
      @Override
-     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-@@ -123,7 +139,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -144,7 +160,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
  
          if (checkGlobal) {
              // This ignores the libraries of other plugins, unless they are transitive dependencies.
@@ -2036,7 +2028,7 @@ index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a
  
              if (result != null) {
                  // If the class was loaded from a library instead of a PluginClassLoader, we can assume that its associated plugin is a transitive dependency and can therefore skip this check.
-@@ -132,14 +148,14 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -153,18 +169,18 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
  
                      if (provider != description
                              && !seenIllegalAccess.contains(provider.getName())
@@ -2051,9 +2043,14 @@ index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a
 -                            loader.server.getLogger().log(Level.WARNING, "[{0}] Loaded class {1} from {2} which is not a depend or softdepend of this plugin.", new Object[]{description.getName(), name, provider.getFullName()});
 +                            this.logger.log(Level.WARNING, "[{0}] Loaded class {1} from {2} which is not a depend or softdepend of this plugin.", new Object[]{description.getName(), name, provider.getFullName()}); // Paper
                          }
+                         // Paper start
+                         if (Boolean.getBoolean("Paper.printStacktraceOnBadPluginClassAccess")) {
+-                            (plugin != null ? plugin.getLogger() : loader.server.getLogger()).log(Level.WARNING, "Stacktrace", new Exception());
++                            (plugin != null ? plugin.getLogger() : Bukkit.getServer().getLogger()).log(Level.WARNING, "Stacktrace", new Exception()); // Paper
+                         }
+                         // Paper end
                      }
-                 }
-@@ -171,7 +187,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -197,7 +213,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
                      throw new ClassNotFoundException(name, ex);
                  }
  
@@ -2062,7 +2059,7 @@ index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a
  
                  int dot = name.lastIndexOf('.');
                  if (dot != -1) {
-@@ -201,7 +217,6 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -227,7 +243,6 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
                  result = super.findClass(name);
              }
  
@@ -2070,7 +2067,7 @@ index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a
              classes.put(name, result);
          }
  
-@@ -211,6 +226,11 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -237,6 +252,11 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
      @Override
      public void close() throws IOException {
          try {
@@ -2082,7 +2079,7 @@ index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a
              super.close();
          } finally {
              jar.close();
-@@ -222,7 +242,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -248,7 +268,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
          return classes.values();
      }
  
@@ -2091,7 +2088,7 @@ index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a
          Preconditions.checkArgument(javaPlugin != null, "Initializing plugin cannot be null");
          Preconditions.checkArgument(javaPlugin.getClass().getClassLoader() == this, "Cannot initialize plugin outside of this class loader");
          if (this.plugin != null || this.pluginInit != null) {
-@@ -233,7 +253,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -259,7 +279,7 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
          this.pluginInit = javaPlugin;
  
          javaPlugin.logger = this.logger; // Paper - set logger
@@ -2100,7 +2097,7 @@ index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a
      }
  
      // Paper start
-@@ -246,5 +266,19 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
+@@ -272,5 +292,19 @@ public final class PluginClassLoader extends URLClassLoader { // Spigot
                     ", url=" + file +
                     '}';
      }
@@ -2121,7 +2118,7 @@ index 345394132df70593800127d34a38f8f8a4dafe00..5ed7b33acabb2aded6e60751640d0b4a
      // Paper end
  }
 diff --git a/src/test/java/org/bukkit/TestServer.java b/src/test/java/org/bukkit/TestServer.java
-index 2f907c18c8f3228df107bfc05c5454354e89b943..8be85a159f8bde4b55a06f206424475450c70c0a 100644
+index bfb39f48bea14ad616c53e2a8a6901e93f728768..643a267d6925208f9465a4441e1bdec4ca7b08c2 100644
 --- a/src/test/java/org/bukkit/TestServer.java
 +++ b/src/test/java/org/bukkit/TestServer.java
 @@ -42,15 +42,7 @@ public final class TestServer implements InvocationHandler {
@@ -2141,7 +2138,7 @@ index 2f907c18c8f3228df107bfc05c5454354e89b943..8be85a159f8bde4b55a06f2064244754
              methodMap.put(
                      Server.class.getMethod("getLogger"),
                      new MethodHandler() {
-@@ -114,7 +106,7 @@ public final class TestServer implements InvocationHandler {
+@@ -124,7 +116,7 @@ public final class TestServer implements InvocationHandler {
              TestServer server = new TestServer();
              Server instance = Proxy.getProxyClass(Server.class.getClassLoader(), Server.class).asSubclass(Server.class).getConstructor(InvocationHandler.class).newInstance(server);
              Bukkit.setServer(instance);

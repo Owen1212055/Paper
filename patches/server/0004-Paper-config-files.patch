@@ -431,7 +431,7 @@ index 0000000000000000000000000000000000000000..c2dca89291361d60cbf160cab77749cb
 +}
 diff --git a/src/main/java/io/papermc/paper/configuration/GlobalConfiguration.java b/src/main/java/io/papermc/paper/configuration/GlobalConfiguration.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..84785fed0d85d78c4caf8fabe35c0e89a59240d5
+index 0000000000000000000000000000000000000000..98bf769487519ccdb9ca5d06006c1305f72aec95
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/configuration/GlobalConfiguration.java
 @@ -0,0 +1,265 @@
@@ -700,16 +700,6 @@ index 0000000000000000000000000000000000000000..84785fed0d85d78c4caf8fabe35c0e89
 +        }
 +        public int maxJoinsPerTick = 3;
 +        public boolean fixEntityPositionDesync = true;
-+        public boolean loadPermissionsYmlBeforePlugins = true;
-+        @Constraints.Min(4)
-+        public int regionFileCacheSize = 256;
-+        @Comment("See https://luckformula.emc.gs")
-+        public boolean useAlternativeLuckFormula = false;
-+        public boolean lagCompensateBlockBreaking = true;
-+        public boolean useDimensionTypeForCustomSpawners = false;
-+        public boolean strictAdvancementDimensionCheck = false;
-+    }
-+}
 diff --git a/src/main/java/io/papermc/paper/configuration/InnerClassFieldDiscoverer.java b/src/main/java/io/papermc/paper/configuration/InnerClassFieldDiscoverer.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..a0aa1f1a7adf986d500a2135aa42e138aa3c4f08
@@ -923,7 +913,7 @@ index 0000000000000000000000000000000000000000..69add4a7f1147015806bc9b63a8340d1
 +}
 diff --git a/src/main/java/io/papermc/paper/configuration/PaperConfigurations.java b/src/main/java/io/papermc/paper/configuration/PaperConfigurations.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..1055a079a061d8761be13d3b9efbbd90d193caa2
+index 0000000000000000000000000000000000000000..e731de3ac158c5a4cff236c6f5001674cd488a77
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/configuration/PaperConfigurations.java
 @@ -0,0 +1,435 @@

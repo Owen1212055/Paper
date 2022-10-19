@@ -4781,10 +4781,10 @@ index 0000000000000000000000000000000000000000..e856f7900026e508a1076c28ccace58a
 +}
 +
 diff --git a/src/main/java/net/minecraft/server/Main.java b/src/main/java/net/minecraft/server/Main.java
-index 0a843e0afbcb1af8e2641515eb244b791b819b8c..5d563a8c9520a348b61b7122cead76aabf8d429f 100644
+index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..33a2d090c2b54bb54c79b65603fe95b7ff7d5eb3 100644
 --- a/src/main/java/net/minecraft/server/Main.java
 +++ b/src/main/java/net/minecraft/server/Main.java
-@@ -64,6 +64,7 @@ import net.minecraft.SharedConstants;
+@@ -68,6 +68,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
  public class Main {
  
      private static final Logger LOGGER = LogUtils.getLogger();
@@ -4792,7 +4792,7 @@ index 0a843e0afbcb1af8e2641515eb244b791b819b8c..5d563a8c9520a348b61b7122cead76aa
  
      public Main() {}
  
-@@ -105,6 +106,18 @@ public class Main {
+@@ -109,6 +110,18 @@ public class Main {
              }
  
              Bootstrap.bootStrap();
@@ -4812,10 +4812,10 @@ index 0a843e0afbcb1af8e2641515eb244b791b819b8c..5d563a8c9520a348b61b7122cead76aa
              Util.startTimerHackThread();
              Path path = Paths.get("server.properties");
 diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..d94cd7da7eee3954f443452a2f3e6cb8e2ba1bfb 100644
+index 111f8276f26350a5c62a7b8577b4598978b5355d..a44cb17e5211b9d74ef6496264636bf102726806 100644
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-@@ -255,7 +255,8 @@ public final class CraftServer implements Server {
+@@ -257,7 +257,8 @@ public final class CraftServer implements Server {
      private final CraftCommandMap commandMap = new CraftCommandMap(this);
      private final SimpleHelpMap helpMap = new SimpleHelpMap(this);
      private final StandardMessenger messenger = new StandardMessenger();
@@ -4825,7 +4825,7 @@ index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..d94cd7da7eee3954f443452a2f3e6cb8
      private final StructureManager structureManager;
      protected final DedicatedServer console;
      protected final DedicatedPlayerList playerList;
-@@ -357,7 +358,7 @@ public final class CraftServer implements Server {
+@@ -359,7 +360,7 @@ public final class CraftServer implements Server {
          this.saveCommandsConfig();
          this.overrideAllCommandBlockCommands = this.commandsConfiguration.getStringList("command-block-overrides").contains("*");
          this.ignoreVanillaPermissions = this.commandsConfiguration.getBoolean("ignore-vanilla-permissions");
@@ -4834,7 +4834,7 @@ index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..d94cd7da7eee3954f443452a2f3e6cb8
          this.overrideSpawnLimits();
          console.autosavePeriod = this.configuration.getInt("ticks-per.autosave");
          this.warningState = WarningState.value(this.configuration.getString("settings.deprecated-verbose"));
-@@ -409,29 +410,7 @@ public final class CraftServer implements Server {
+@@ -411,29 +412,7 @@ public final class CraftServer implements Server {
      }
  
      public void loadPlugins() {
@@ -4865,7 +4865,7 @@ index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..d94cd7da7eee3954f443452a2f3e6cb8
      }
  
      // Paper start
-@@ -550,15 +529,17 @@ public final class CraftServer implements Server {
+@@ -552,15 +531,17 @@ public final class CraftServer implements Server {
      private void enablePlugin(Plugin plugin) {
          try {
              List<Permission> perms = plugin.getDescription().getPermissions();
@@ -4889,7 +4889,7 @@ index a8cf1ab9d7504dfdb2310f1dca82324a225bea7d..d94cd7da7eee3954f443452a2f3e6cb8
  
              this.pluginManager.enablePlugin(plugin);
          } catch (Throwable ex) {
-@@ -2790,7 +2771,7 @@ public final class CraftServer implements Server {
+@@ -2802,7 +2783,7 @@ public final class CraftServer implements Server {
  
      @Override
      public void reloadPermissions() {
