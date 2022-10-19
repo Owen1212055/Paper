@@ -4797,7 +4797,7 @@ index 0000000000000000000000000000000000000000..e856f7900026e508a1076c28ccace58a
 +}
 +
 diff --git a/src/main/java/net/minecraft/server/Main.java b/src/main/java/net/minecraft/server/Main.java
-index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..ba67a378f4622744285f9a9647c235f67226f9bc 100644
+index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..336e8a0e6be520bac6bdab5124783674aa9d4619 100644
 --- a/src/main/java/net/minecraft/server/Main.java
 +++ b/src/main/java/net/minecraft/server/Main.java
 @@ -68,6 +68,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
@@ -4808,10 +4808,10 @@ index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..ba67a378f4622744285f9a9647c235f6
  
      public Main() {}
  
-@@ -109,6 +110,17 @@ public class Main {
+@@ -108,6 +109,17 @@ public class Main {
+                 JvmProfiler.INSTANCE.start(Environment.SERVER);
              }
  
-             Bootstrap.bootStrap();
 +            // Paper start
 +            io.papermc.paper.plugin.provider.source.Providers provider = io.papermc.paper.plugin.provider.source.Providers.INSTANCE;
 +            File pluginfile = (File) optionset.valueOf("plugins");
@@ -4823,9 +4823,9 @@ index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..ba67a378f4622744285f9a9647c235f6
 +            pluginDirectory = pluginfile.toPath();
 +            io.papermc.paper.plugin.provider.service.entrypoint.ServerEntryPointHandler.INSTANCE.enter(io.papermc.paper.plugin.provider.service.entrypoint.Entrypoint.BOOTSTRAPPER);
 +            // Paper end
+             Bootstrap.bootStrap();
              Bootstrap.validate();
              Util.startTimerHackThread();
-             Path path = Paths.get("server.properties");
 diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 index 111f8276f26350a5c62a7b8577b4598978b5355d..a44cb17e5211b9d74ef6496264636bf102726806 100644
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
