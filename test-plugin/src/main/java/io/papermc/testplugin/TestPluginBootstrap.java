@@ -3,6 +3,7 @@ package io.papermc.testplugin;
 import io.papermc.paper.plugin.bootstrap.PluginBootstrap;
 import io.papermc.paper.plugin.bootstrap.PluginBootstrapContext;
 import io.papermc.paper.registry.RegistryAccess;
+import io.papermc.paper.registry.RegistryDebugging;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
@@ -14,7 +15,7 @@ public class TestPluginBootstrap implements PluginBootstrap {
     public String secret;
 
     @Override
-    public void boostrap(@NotNull PluginBootstrapContext context) {
+    public void bootstrap(@NotNull PluginBootstrapContext context) {
         Logger logger = context.getLogger();
 
         logger.log(Level.INFO, "Hello from Initializer! :) This runs before the server start, that's cool!");
@@ -22,6 +23,10 @@ public class TestPluginBootstrap implements PluginBootstrap {
 
         logger.log(Level.SEVERE, "Cool initializer error for showing stacktrace only.", new AssertionError());
         RegistryAccess.getInstance();
+        RegistryDebugging.INSTANCE.debugAddChatType();
+        RegistryDebugging.INSTANCE.debugAddDimension();
+        RegistryDebugging.INSTANCE.debugAddMemory();
+
         this.secret = "HI";
     }
 

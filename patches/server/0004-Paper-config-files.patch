@@ -431,10 +431,10 @@ index 0000000000000000000000000000000000000000..c2dca89291361d60cbf160cab77749cb
 +}
 diff --git a/src/main/java/io/papermc/paper/configuration/GlobalConfiguration.java b/src/main/java/io/papermc/paper/configuration/GlobalConfiguration.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..98bf769487519ccdb9ca5d06006c1305f72aec95
+index 0000000000000000000000000000000000000000..84785fed0d85d78c4caf8fabe35c0e89a59240d5
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/configuration/GlobalConfiguration.java
-@@ -0,0 +1,265 @@
+@@ -0,0 +1,275 @@
 +package io.papermc.paper.configuration;
 +
 +import co.aikar.timings.MinecraftTimings;
@@ -700,6 +700,16 @@ index 0000000000000000000000000000000000000000..98bf769487519ccdb9ca5d06006c1305
 +        }
 +        public int maxJoinsPerTick = 3;
 +        public boolean fixEntityPositionDesync = true;
++        public boolean loadPermissionsYmlBeforePlugins = true;
++        @Constraints.Min(4)
++        public int regionFileCacheSize = 256;
++        @Comment("See https://luckformula.emc.gs")
++        public boolean useAlternativeLuckFormula = false;
++        public boolean lagCompensateBlockBreaking = true;
++        public boolean useDimensionTypeForCustomSpawners = false;
++        public boolean strictAdvancementDimensionCheck = false;
++    }
++}
 diff --git a/src/main/java/io/papermc/paper/configuration/InnerClassFieldDiscoverer.java b/src/main/java/io/papermc/paper/configuration/InnerClassFieldDiscoverer.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..a0aa1f1a7adf986d500a2135aa42e138aa3c4f08

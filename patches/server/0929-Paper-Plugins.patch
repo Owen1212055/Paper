@@ -18,6 +18,7 @@ These patches (will) be merged into this as this PR removes the usages of the fi
 - Automatically disable plugins that fail to load (Aikar <aikar@aikar.co>)
 - Add an asterisk to legacy API plugins (Phoenix616 <max@themoep.de>)
 - Make /plugins list alphabetical (BillyGalbreath <Blake.Galbreath@GMail.com>)
+Also load resources from LibraryLoader (Nick Hensel <nickhensel25@icloud.com>)
 
 PATCHES TO MODIFY:
 - Add command line option to load extra plugin jars not in the plugins folder (Jason Penilla <11360596+jpenilla@users.noreply.github.com>)
@@ -2743,10 +2744,10 @@ index 0000000000000000000000000000000000000000..8455ee70ed94c8665b84e1244e94e7a2
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/ServerEntryPointHandler.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/ServerEntryPointHandler.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..b8616cb2537dc3e27d3dee008f8a50837a13a286
+index 0000000000000000000000000000000000000000..320a60b8e7e01478087a1a39b1f5888019e832a6
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/ServerEntryPointHandler.java
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,54 @@
 +package io.papermc.paper.plugin.provider.service.entrypoint;
 +
 +import io.papermc.paper.plugin.provider.PluginProvider;
@@ -2792,6 +2793,13 @@ index 0000000000000000000000000000000000000000..b8616cb2537dc3e27d3dee008f8a5083
 +    @SuppressWarnings("unchecked")
 +    public <T> ProviderStorage<T> get(Entrypoint<PluginProvider<T>> entrypoint) {
 +        return (ProviderStorage<T>) this.storage.get(entrypoint);
++    }
++
++    // Utility
++    public static void enterBootstrappers() {
++        if (INSTANCE != null) {
++            ServerEntryPointHandler.INSTANCE.enter(Entrypoint.BOOTSTRAPPER);
++        }
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ProviderStorage.java
@@ -4796,8 +4804,69 @@ index 0000000000000000000000000000000000000000..e856f7900026e508a1076c28ccace58a
 +    }
 +}
 +
+diff --git a/src/main/java/io/papermc/paper/registry/RegistryDebuggingImpl.java b/src/main/java/io/papermc/paper/registry/RegistryDebuggingImpl.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..872f17c508d6d94cec7390241058c1f120236f05
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/registry/RegistryDebuggingImpl.java
+@@ -0,0 +1,43 @@
++package io.papermc.paper.registry;
++
++import net.minecraft.core.Registry;
++import net.minecraft.data.BuiltinRegistries;
++import net.minecraft.network.chat.ChatType;
++import net.minecraft.network.chat.ChatTypeDecoration;
++import net.minecraft.resources.ResourceKey;
++import net.minecraft.resources.ResourceLocation;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.tags.BlockTags;
++import net.minecraft.util.valueproviders.UniformInt;
++import net.minecraft.world.entity.ai.memory.MemoryModuleType;
++import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
++import net.minecraft.world.level.dimension.DimensionType;
++
++import java.util.Optional;
++import java.util.OptionalLong;
++
++public class RegistryDebuggingImpl extends RegistryDebugging {
++    public static void init() {
++        RegistryDebugging.INSTANCE = new RegistryDebuggingImpl();
++    }
++
++    @Override
++    public void debugAddDimension() {
++        BuiltinRegistries.register(BuiltinRegistries.DIMENSION_TYPE,
++            new ResourceLocation("debugger:dimension_new"),
++            new DimensionType(OptionalLong.empty(), true, false, false, true, 1.0D, true, false, -64, 384, 384, BlockTags.INFINIBURN_OVERWORLD, BuiltinDimensionTypes.OVERWORLD_EFFECTS, 0.0F, new DimensionType.MonsterSettings(false, true, UniformInt.of(0, 7), 0)));
++    }
++
++    @Override
++    public void debugAddChatType() {
++        BuiltinRegistries.register(BuiltinRegistries.CHAT_TYPE,
++            new ResourceLocation("debugger:chat_new"),
++            new ChatType(ChatTypeDecoration.outgoingDirectMessage("commands.message.display.outgoing"),
++                ChatTypeDecoration.withSender("chat.type.text.narrate")));
++    }
++
++    @Override
++    public void debugAddMemory() {
++        Registry.register(Registry.MEMORY_MODULE_TYPE, new ResourceLocation("debugger:memory_new"), new MemoryModuleType<>(Optional.empty()));
++    }
++}
+diff --git a/src/main/java/net/minecraft/server/Bootstrap.java b/src/main/java/net/minecraft/server/Bootstrap.java
+index 0ece775ca7e63184f79fcdd1aa7ed5c16fc9bc9e..ee18584c3cf6aa08e8a4eb41f62875adb4145d73 100644
+--- a/src/main/java/net/minecraft/server/Bootstrap.java
++++ b/src/main/java/net/minecraft/server/Bootstrap.java
+@@ -76,6 +76,7 @@ public class Bootstrap {
+                     DispenseItemBehavior.bootStrap();
+                     CauldronInteraction.bootStrap();
+                     Registry.register(net.minecraft.core.Registry.CONDITION, new net.minecraft.resources.ResourceLocation("paper", "bedrock_condition_source"), net.minecraft.data.worldgen.SurfaceRuleData.PaperBedrockConditionSource.CODEC.codec()); // Paper - register custom flat bedrock thing. TODO is this the best place to do this?
++                    io.papermc.paper.plugin.provider.service.entrypoint.ServerEntryPointHandler.enterBootstrappers(); // Paper - Entrypoint for bootstrapping
+                     Registry.freezeBuiltins();
+                     Bootstrap.wrapStreams();
+                 }
 diff --git a/src/main/java/net/minecraft/server/Main.java b/src/main/java/net/minecraft/server/Main.java
-index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..336e8a0e6be520bac6bdab5124783674aa9d4619 100644
+index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..84aabd86e07fb8ed5992c43c6ae0d0a9e2a04abd 100644
 --- a/src/main/java/net/minecraft/server/Main.java
 +++ b/src/main/java/net/minecraft/server/Main.java
 @@ -68,6 +68,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
@@ -4821,7 +4890,7 @@ index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..336e8a0e6be520bac6bdab5124783674
 +            java.util.List<File> files = (java.util.List<File>) optionset.valuesOf("add-plugin");
 +            provider.addProviders(io.papermc.paper.plugin.provider.source.impl.PluginFlagProviderSource.INSTANCE, files);
 +            pluginDirectory = pluginfile.toPath();
-+            io.papermc.paper.plugin.provider.service.entrypoint.ServerEntryPointHandler.INSTANCE.enter(io.papermc.paper.plugin.provider.service.entrypoint.Entrypoint.BOOTSTRAPPER);
++            io.papermc.paper.registry.RegistryDebuggingImpl.init();
 +            // Paper end
              Bootstrap.bootStrap();
              Bootstrap.validate();

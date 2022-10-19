@@ -1242,6 +1242,28 @@ index 0000000000000000000000000000000000000000..ce66c664003e80087df88bded37ef17b
 +        return new RegistryAccess();
 +    }
 +}
+diff --git a/src/main/java/io/papermc/paper/registry/RegistryDebugging.java b/src/main/java/io/papermc/paper/registry/RegistryDebugging.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..effc53d19c3955d04529fd36710f74815545381c
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/registry/RegistryDebugging.java
+@@ -0,0 +1,16 @@
++package io.papermc.paper.registry;
++
++import org.jetbrains.annotations.ApiStatus;
++
++// Remove later
++@ApiStatus.Internal
++public abstract class RegistryDebugging {
++
++    public static RegistryDebugging INSTANCE = null;
++
++    public abstract void debugAddDimension();
++
++    public abstract void debugAddChatType();
++
++    public abstract void debugAddMemory();
++}
 diff --git a/src/main/java/org/bukkit/command/PluginCommand.java b/src/main/java/org/bukkit/command/PluginCommand.java
 index 1dbbc244309043b18c1d71707c4fb066c0d0e02d..08d3ff24d5318b0c77d6467bcb705bffac202842 100644
 --- a/src/main/java/org/bukkit/command/PluginCommand.java
