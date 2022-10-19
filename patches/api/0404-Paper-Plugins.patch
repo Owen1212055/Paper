@@ -276,14 +276,15 @@ index 0000000000000000000000000000000000000000..aab8e324b4638357d9aaeadf17da5e5f
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrap.java b/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrap.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..721cdeacdbc74c23811fc0119e213e1d8df92275
+index 0000000000000000000000000000000000000000..c5834f3c9d3b089ee7d47d20b6614eafa1268e73
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/bootstrap/PluginBootstrap.java
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,38 @@
 +package io.papermc.paper.plugin.bootstrap;
 +
 +import io.papermc.paper.plugin.provider.util.ProviderUtil;
 +import org.bukkit.plugin.java.JavaPlugin;
++import org.jetbrains.annotations.ApiStatus;
 +import org.jetbrains.annotations.NotNull;
 +
 +/**
@@ -296,6 +297,7 @@ index 0000000000000000000000000000000000000000..721cdeacdbc74c23811fc0119e213e1d
 + * <p>
 + * <b>All calls to Bukkit may throw a NullPointerExceptions or return null unexpectedly. You should only call api methods that are explicitly documented to work in the bootstrapper</b>
 + */
++@ApiStatus.OverrideOnly
 +public interface PluginBootstrap {
 +
 +    /**
@@ -303,7 +305,7 @@ index 0000000000000000000000000000000000000000..721cdeacdbc74c23811fc0119e213e1d
 +     *
 +     * @param context server provided context
 +     */
-+    void boostrap(@NotNull PluginBootstrapContext context);
++    void bootstrap(@NotNull PluginBootstrapContext context);
 +
 +    /**
 +     * Called by the server, allows you to create your own java plugin instance inorder to do things such as
@@ -370,7 +372,7 @@ index 0000000000000000000000000000000000000000..732d59c2f176f8ad80908db4d224cfb2
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/configuration/BukkitConfigurationWrapper.java b/src/main/java/io/papermc/paper/plugin/configuration/BukkitConfigurationWrapper.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0a8a020015a143ad3910e18eb107c20073cd7ee1
+index 0000000000000000000000000000000000000000..ee8dbd30d1d9dbe58ea9aa88672ef78ed882aac2
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/configuration/BukkitConfigurationWrapper.java
 @@ -0,0 +1,131 @@
@@ -469,8 +471,8 @@ index 0000000000000000000000000000000000000000..0a8a020015a143ad3910e18eb107c200
 +    }
 +
 +    @Override
-+    default @NotNull List<String> getProvides() {
-+        return nullable(this.spigotDescription().getProvides());
++    default @NotNull List<String> getProvidedPlugins() {
++        return nullable(this.spigotDescription().getProvidedPlugins());
 +    }
 +
 +    @Override
@@ -507,16 +509,17 @@ index 0000000000000000000000000000000000000000..0a8a020015a143ad3910e18eb107c200
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/configuration/PluginConfiguration.java b/src/main/java/io/papermc/paper/plugin/configuration/PluginConfiguration.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..3b9f9f3caa5c725739c9937a4cb9d6d8ff9c8a8e
+index 0000000000000000000000000000000000000000..00a6a241daff09b3492a6bef42a4fe3a48badfcd
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/configuration/PluginConfiguration.java
-@@ -0,0 +1,171 @@
+@@ -0,0 +1,173 @@
 +package io.papermc.paper.plugin.configuration;
 +
 +import org.bukkit.permissions.Permission;
 +import org.bukkit.permissions.PermissionDefault;
 +import org.bukkit.plugin.PluginLoadOrder;
 +import org.bukkit.plugin.java.JavaPlugin;
++import org.jetbrains.annotations.ApiStatus;
 +import org.jetbrains.annotations.NotNull;
 +import org.jetbrains.annotations.Nullable;
 +
@@ -525,6 +528,7 @@ index 0000000000000000000000000000000000000000..3b9f9f3caa5c725739c9937a4cb9d6d8
 +/**
 + * This class acts as an abstraction for a plugin configuration.
 + */
++@ApiStatus.NonExtendable
 +public interface PluginConfiguration {
 +
 +    /**
@@ -620,7 +624,7 @@ index 0000000000000000000000000000000000000000..3b9f9f3caa5c725739c9937a4cb9d6d8
 +     * @return immutable list of provided plugins/dependencies
 +     */
 +    @NotNull
-+    List<String> getProvides();
++    List<String> getProvidedPlugins();
 +
 +    /**
 +     * Gives a list of authors that created this plugin.
@@ -684,18 +688,20 @@ index 0000000000000000000000000000000000000000..3b9f9f3caa5c725739c9937a4cb9d6d8
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/loader/PluginClasspathBuilder.java b/src/main/java/io/papermc/paper/plugin/loader/PluginClasspathBuilder.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..4a88737767a811af70fe14fd725c825905e67670
+index 0000000000000000000000000000000000000000..0d8e7ae4225fe89944c56182fa1a28778c0dcedc
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/loader/PluginClasspathBuilder.java
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,33 @@
 +package io.papermc.paper.plugin.loader;
 +
 +import io.papermc.paper.plugin.loader.library.ClassPathLibrary;
++import org.jetbrains.annotations.ApiStatus;
 +import org.jetbrains.annotations.NotNull;
 +
 +/**
 + * Class used for building classpath configurations in plugin loading.
 + */
++@ApiStatus.NonExtendable
 +public interface PluginClasspathBuilder {
 +
 +    /**
@@ -721,12 +727,13 @@ index 0000000000000000000000000000000000000000..4a88737767a811af70fe14fd725c8259
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/loader/PluginLoader.java b/src/main/java/io/papermc/paper/plugin/loader/PluginLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..984301dd39faaaf6b64ceef118db4b21caf83048
+index 0000000000000000000000000000000000000000..7237708083d9266499993f2ea8b36522c93a480f
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/loader/PluginLoader.java
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,27 @@
 +package io.papermc.paper.plugin.loader;
 +
++import org.jetbrains.annotations.ApiStatus;
 +import org.jetbrains.annotations.NotNull;
 +
 +/**
@@ -738,6 +745,7 @@ index 0000000000000000000000000000000000000000..984301dd39faaaf6b64ceef118db4b21
 + * It should be noted that this class will be called from a different classloader, this will cause any static values
 + * set in this class/any other classes loaded not to persist when the plugin loads.
 + */
++@ApiStatus.OverrideOnly
 +public interface PluginLoader {
 +
 +    /**
@@ -796,12 +804,13 @@ index 0000000000000000000000000000000000000000..79ba423a364b50588f3ee87fdc69155c
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/loader/library/LibraryStore.java b/src/main/java/io/papermc/paper/plugin/loader/library/LibraryStore.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..60d336b9524d5250498e1aa7ea902d5854cee3c8
+index 0000000000000000000000000000000000000000..7659e1ce29bb74d033c23cf4c52657baad9f632a
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/loader/library/LibraryStore.java
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,16 @@
 +package io.papermc.paper.plugin.loader.library;
 +
++import org.jetbrains.annotations.ApiStatus;
 +import org.jetbrains.annotations.NotNull;
 +
 +import java.nio.file.Path;
@@ -809,6 +818,7 @@ index 0000000000000000000000000000000000000000..60d336b9524d5250498e1aa7ea902d58
 +/**
 + * Represents a storage that stores library jars.
 + */
++@ApiStatus.Internal
 +public interface LibraryStore {
 +
 +    void addLibrary(@NotNull Path library);
@@ -854,11 +864,11 @@ index 0000000000000000000000000000000000000000..dac76de2cfc5f537b2c237780a3bed0d
 +        store.addLibrary(this.path);
 +    }
 +}
-diff --git a/src/main/java/io/papermc/paper/plugin/loader/library/impl/maven/MavenLibraryResolver.java b/src/main/java/io/papermc/paper/plugin/loader/library/impl/maven/MavenLibraryResolver.java
+diff --git a/src/main/java/io/papermc/paper/plugin/loader/library/impl/maven/MavenLibrary.java b/src/main/java/io/papermc/paper/plugin/loader/library/impl/maven/MavenLibrary.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..382c5472ed5702e8ee787a84a74cd33e336b0a11
+index 0000000000000000000000000000000000000000..635c9d2dac81bdfe60d16f58778661a88da4b93a
 --- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/loader/library/impl/maven/MavenLibraryResolver.java
++++ b/src/main/java/io/papermc/paper/plugin/loader/library/impl/maven/MavenLibrary.java
 @@ -0,0 +1,119 @@
 +package io.papermc.paper.plugin.loader.library.impl.maven;
 +
@@ -898,7 +908,7 @@ index 0000000000000000000000000000000000000000..382c5472ed5702e8ee787a84a74cd33e
 + * A maven library, this allows you to resolve jars from maven repositories.
 + * This class will automatically cache resolved libraries when needed into the libraries directory.
 + */
-+public class MavenLibraryResolver implements ClassPathLibrary {
++public class MavenLibrary implements ClassPathLibrary {
 +
 +    private static final Logger logger = Logger.getLogger("MavenLibraryResolver");
 +
@@ -909,7 +919,7 @@ index 0000000000000000000000000000000000000000..382c5472ed5702e8ee787a84a74cd33e
 +
 +    private DependencyFilter filter = null;
 +
-+    public MavenLibraryResolver() {
++    public MavenLibrary() {
 +        DefaultServiceLocator locator = MavenRepositorySystemUtils.newServiceLocator();
 +        locator.addService(RepositoryConnectorFactory.class, BasicRepositoryConnectorFactory.class);
 +        locator.addService(TransporterFactory.class, HttpTransporterFactory.class);
@@ -934,7 +944,7 @@ index 0000000000000000000000000000000000000000..382c5472ed5702e8ee787a84a74cd33e
 +     * The dependency from the first valid repository will be chosen.
 +     *
 +     * @param dependency provided dependency
-+     * @see MavenLibraryResolver#addRepository(RemoteRepository)
++     * @see MavenLibrary#addRepository(RemoteRepository)
 +     */
 +    public void addDependency(@NotNull Dependency dependency) {
 +        this.dependencies.add(dependency);
@@ -978,6 +988,34 @@ index 0000000000000000000000000000000000000000..382c5472ed5702e8ee787a84a74cd33e
 +            store.addLibrary(file.toPath());
 +        }
 +    }
++}
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/ClassloaderBytecodeModifier.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/ClassloaderBytecodeModifier.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..49c5018065ed3948b553b9e05d3857c9964f31cf
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/ClassloaderBytecodeModifier.java
+@@ -0,0 +1,22 @@
++package io.papermc.paper.plugin.provider.service.classloader;
++
++import io.papermc.paper.plugin.configuration.PluginConfiguration;
++import net.kyori.adventure.util.Services;
++import org.jetbrains.annotations.ApiStatus;
++
++@ApiStatus.Internal
++public interface ClassloaderBytecodeModifier {
++
++    static ClassloaderBytecodeModifier bytecodeModifier() {
++        return Provider.INSTANCE;
++    }
++
++    byte[] modify(PluginConfiguration config, byte[] bytecode);
++
++    class Provider {
++
++        private static final ClassloaderBytecodeModifier INSTANCE = Services.service(ClassloaderBytecodeModifier.class).orElseThrow();
++
++    }
++
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/ConfiguredPluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/ConfiguredPluginClassLoader.java
 new file mode 100644
@@ -1089,38 +1127,6 @@ index 0000000000000000000000000000000000000000..82d387b55a25e5418c763b97b77f5bec
 +    public boolean contains(ConfiguredPluginClassLoader pluginLoader) {
 +        return this.classLoaders.contains(pluginLoader);
 +    }
-+}
-diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/bytecode/ClassloaderBytecodeModifier.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/bytecode/ClassloaderBytecodeModifier.java
-new file mode 100644
-index 0000000000000000000000000000000000000000..d332f21f3dd7426f26ee00c6e0247864e430e299
---- /dev/null
-+++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/bytecode/ClassloaderBytecodeModifier.java
-@@ -0,0 +1,26 @@
-+package io.papermc.paper.plugin.provider.service.classloader.bytecode;
-+
-+import io.papermc.paper.plugin.configuration.PluginConfiguration;
-+import org.jetbrains.annotations.ApiStatus;
-+
-+@ApiStatus.Internal
-+public abstract class ClassloaderBytecodeModifier {
-+
-+    public static ClassloaderBytecodeModifier INSTANCE;
-+
-+    public static void setInstance(ClassloaderBytecodeModifier instance) {
-+        if (INSTANCE != null)  {
-+            throw new IllegalStateException();
-+        }
-+
-+        INSTANCE = instance;
-+    }
-+
-+    public static ClassloaderBytecodeModifier getInstance() {
-+        return INSTANCE;
-+    }
-+
-+
-+    public abstract byte[] modify(PluginConfiguration config, byte[] bytecode);
-+
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/util/NamespaceChecker.java b/src/main/java/io/papermc/paper/plugin/provider/util/NamespaceChecker.java
 new file mode 100644

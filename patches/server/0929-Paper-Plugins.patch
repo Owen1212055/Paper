@@ -301,7 +301,7 @@ index 0000000000000000000000000000000000000000..0188d4e42d9a06df38ed02803dca79b8
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/GraphDependencyContext.java b/src/main/java/io/papermc/paper/plugin/GraphDependencyContext.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..cabe9a56df7553f083a5c2525693b17a44360563
+index 0000000000000000000000000000000000000000..69a1b6d44fbd33d95250dff5346050e6ae0c06a6
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/GraphDependencyContext.java
 @@ -0,0 +1,41 @@
@@ -330,7 +330,7 @@ index 0000000000000000000000000000000000000000..cabe9a56df7553f083a5c2525693b17a
 +            if (reachableNodes.contains(depend.getIdentifier())) {
 +                return true;
 +            }
-+            for (String provided : depend.getProvides()) {
++            for (String provided : depend.getProvidedPlugins()) {
 +                if (reachableNodes.contains(provided)) {
 +                    return true;
 +                }
@@ -963,7 +963,7 @@ index 0000000000000000000000000000000000000000..1cd7b52b22285c49d98d4d1e482d944d
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0473d0a764016bcc127696e73e0c39149dfbf5eb
+index 0000000000000000000000000000000000000000..f2890ad16542985f95babe5a9a600c7a83c3f90e
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
 @@ -0,0 +1,376 @@
@@ -1055,7 +1055,7 @@ index 0000000000000000000000000000000000000000..0473d0a764016bcc127696e73e0c3914
 +
 +        this.plugins.add(provided);
 +        this.lookupNames.put(configuration.getIdentifier().toLowerCase(java.util.Locale.ENGLISH), provided);
-+        for (String providedPlugin : configuration.getProvides()) {
++        for (String providedPlugin : configuration.getProvidedPlugins()) {
 +            this.lookupNames.putIfAbsent(providedPlugin.toLowerCase(java.util.Locale.ENGLISH), provided);
 +        }
 +
@@ -1329,7 +1329,7 @@ index 0000000000000000000000000000000000000000..0473d0a764016bcc127696e73e0c3914
 +            if (reachableNodes.contains(depend.getIdentifier())) {
 +                return true;
 +            }
-+            for (String provided : depend.getProvides()) {
++            for (String provided : depend.getProvidedPlugins()) {
 +                if (reachableNodes.contains(provided)) {
 +                    return true;
 +                }
@@ -1794,7 +1794,7 @@ index 0000000000000000000000000000000000000000..6ba3bcc468c0a60c76d6d0f0243bda66
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..463fb14cd395837957943c35b80183d83784e602
+index 0000000000000000000000000000000000000000..e48a1ee287649844d518233e6f71a62ebdf9e3d0
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/configuration/PaperPluginConfiguration.java
 @@ -0,0 +1,211 @@
@@ -1993,7 +1993,7 @@ index 0000000000000000000000000000000000000000..463fb14cd395837957943c35b80183d8
 +    }
 +
 +    @Override
-+    public @NotNull List<String> getProvides() {
++    public @NotNull List<String> getProvidedPlugins() {
 +        return this.provides;
 +    }
 +
@@ -2378,21 +2378,16 @@ index 0000000000000000000000000000000000000000..a180612a1ec395202dbae1ca5b97ec01
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperClassloaderBytecodeModifier.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperClassloaderBytecodeModifier.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..9cfac374ac7288b458f01abb77ddf68e7d21a9e0
+index 0000000000000000000000000000000000000000..97fe93ef816f9b79ee1f0bf8385873252f7ea501
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperClassloaderBytecodeModifier.java
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,12 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
 +import io.papermc.paper.plugin.configuration.PluginConfiguration;
-+import io.papermc.paper.plugin.provider.service.classloader.bytecode.ClassloaderBytecodeModifier;
 +
 +// Stub, implement in future.
-+public class PaperClassloaderBytecodeModifier extends ClassloaderBytecodeModifier {
-+
-+    public static void init() {
-+        ClassloaderBytecodeModifier.setInstance(new PaperClassloaderBytecodeModifier());
-+    }
++public class PaperClassloaderBytecodeModifier implements ClassloaderBytecodeModifier {
 +
 +    @Override
 +    public byte[] modify(PluginConfiguration configuration, byte[] bytecode) {
@@ -2401,7 +2396,7 @@ index 0000000000000000000000000000000000000000..9cfac374ac7288b458f01abb77ddf68e
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..c14201fd42bd1ffa5ae68dbd4184e55a83183638
+index 0000000000000000000000000000000000000000..e3e965c6ec2a9a18f44a256c0822dab549441b4b
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
 @@ -0,0 +1,161 @@
@@ -2520,7 +2515,7 @@ index 0000000000000000000000000000000000000000..c14201fd42bd1ffa5ae68dbd4184e55a
 +        PluginDescriptionFile pluginDescriptionFile = new PluginDescriptionFile(
 +            config.getIdentifier(),
 +            config.getDisplayName(),
-+            config.getProvides(),
++            config.getProvidedPlugins(),
 +            config.getMain(),
 +            "", // Classloader load order api
 +            config.getHardDependencies(),
@@ -2568,14 +2563,13 @@ index 0000000000000000000000000000000000000000..c14201fd42bd1ffa5ae68dbd4184e55a
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..180d52ce6cdd55540c5f86cbb5f67887a85d93e6
+index 0000000000000000000000000000000000000000..671e35212ded4ec4d237cc79c39067b210d89acd
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperSimplePluginClassLoader.java
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,116 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
 +import io.papermc.paper.plugin.configuration.PluginConfiguration;
-+import io.papermc.paper.plugin.provider.service.classloader.bytecode.ClassloaderBytecodeModifier;
 +import io.papermc.paper.plugin.provider.util.NamespaceChecker;
 +import org.jetbrains.annotations.ApiStatus;
 +
@@ -2648,7 +2642,7 @@ index 0000000000000000000000000000000000000000..180d52ce6cdd55540c5f86cbb5f67887
 +            throw new ClassNotFoundException(name, ex);
 +        }
 +
-+        classBytes = ClassloaderBytecodeModifier.INSTANCE.modify(this.configuration, classBytes);
++        classBytes = ClassloaderBytecodeModifier.bytecodeModifier().modify(this.configuration, classBytes);
 +
 +        int dot = name.lastIndexOf('.');
 +        if (dot != -1) {
@@ -2835,7 +2829,7 @@ index 0000000000000000000000000000000000000000..6ba8daac385844a2af4ab861f60837f2
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/BootstrapProviderStorage.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/BootstrapProviderStorage.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..6a30e697c3391b9cef814f33e5eb3f7502727df1
+index 0000000000000000000000000000000000000000..e254f85ec98b24bb527ac02e1467c91fb13cfd68
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/BootstrapProviderStorage.java
 @@ -0,0 +1,76 @@
@@ -2875,7 +2869,7 @@ index 0000000000000000000000000000000000000000..6a30e697c3391b9cef814f33e5eb3f75
 +            public boolean load(PluginProvider<PluginBootstrap> provider, PluginBootstrap provided) {
 +                try {
 +                    PluginBootstrapContext context = PluginBootstrapContextImpl.of(provider, Main.pluginDirectory);
-+                    provided.boostrap(context);
++                    provided.bootstrap(context);
 +                    return true;
 +                } catch (Exception e) {
 +                    provider.getLogger().log(Level.SEVERE, "Failed to run bootstrapper for %s. This plugin will not be loaded.".formatted(provider.getSource()), e);
@@ -3741,7 +3735,7 @@ index 0000000000000000000000000000000000000000..b38b4cf226181afd750da3f3a843061c
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/ModernPluginLoadingStrategy.java b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/ModernPluginLoadingStrategy.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..b1ff64e018c77c5f5de1a4700176d9b626fbee65
+index 0000000000000000000000000000000000000000..656736e9bf1630647e0882c35d78482808c538ed
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/entrypoint/storage/ordered/strategy/ModernPluginLoadingStrategy.java
 @@ -0,0 +1,136 @@
@@ -3792,7 +3786,7 @@ index 0000000000000000000000000000000000000000..b1ff64e018c77c5f5de1a4700176d9b6
 +                    ));
 +                }
 +
-+                for (String provides : providerConfig.getProvides()) {
++                for (String provides : providerConfig.getProvidedPlugins()) {
 +                    PluginProvider<T> removedProvided = providerMap.put(provides, provider);
 +                    if (removedProvided != null) {
 +                        LOGGER.warning(
@@ -4781,7 +4775,7 @@ index 0000000000000000000000000000000000000000..e856f7900026e508a1076c28ccace58a
 +}
 +
 diff --git a/src/main/java/net/minecraft/server/Main.java b/src/main/java/net/minecraft/server/Main.java
-index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..33a2d090c2b54bb54c79b65603fe95b7ff7d5eb3 100644
+index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..ba67a378f4622744285f9a9647c235f67226f9bc 100644
 --- a/src/main/java/net/minecraft/server/Main.java
 +++ b/src/main/java/net/minecraft/server/Main.java
 @@ -68,6 +68,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
@@ -4792,12 +4786,11 @@ index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..33a2d090c2b54bb54c79b65603fe95b7
  
      public Main() {}
  
-@@ -109,6 +110,18 @@ public class Main {
+@@ -109,6 +110,17 @@ public class Main {
              }
  
              Bootstrap.bootStrap();
 +            // Paper start
-+            io.papermc.paper.plugin.provider.service.classloader.PaperClassloaderBytecodeModifier.init();
 +            io.papermc.paper.plugin.provider.source.Providers provider = io.papermc.paper.plugin.provider.source.Providers.INSTANCE;
 +            File pluginfile = (File) optionset.valueOf("plugins");
 +            provider.addProviders(io.papermc.paper.plugin.provider.source.impl.DirectoryProviderSource.INSTANCE, pluginfile.toPath());
@@ -4922,6 +4915,14 @@ index 909b2c98e7a9117d2f737245e4661792ffafb744..2c1936d099f37152631cd8b7cf5f88b2
  
      @Override
      public FileConfiguration getConfig() {
+diff --git a/src/main/resources/META-INF/services/io.papermc.paper.plugin.provider.service.classloader.ClassloaderBytecodeModifier b/src/main/resources/META-INF/services/io.papermc.paper.plugin.provider.service.classloader.ClassloaderBytecodeModifier
+new file mode 100644
+index 0000000000000000000000000000000000000000..f8914d7b7815a1625a0315b3fb8b4d49629693c4
+--- /dev/null
++++ b/src/main/resources/META-INF/services/io.papermc.paper.plugin.provider.service.classloader.ClassloaderBytecodeModifier
+@@ -0,0 +1 @@
++io.papermc.paper.plugin.provider.service.classloader.PaperClassloaderBytecodeModifier
+\ No newline at end of file
 diff --git a/src/test/java/io/papermc/paper/plugin/DependencyLoadingTest.java b/src/test/java/io/papermc/paper/plugin/DependencyLoadingTest.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..9bfcf9d989a7bccd03d5496b23614aa8661f95d2
@@ -5432,7 +5433,7 @@ index 0000000000000000000000000000000000000000..50141d11ceb08c382c989f61c8762629
 +}
 diff --git a/src/test/java/io/papermc/paper/plugin/TestPluginConfiguration.java b/src/test/java/io/papermc/paper/plugin/TestPluginConfiguration.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..f4d0eda6d9fe9e5b457a39efd4a37039e268d4c0
+index 0000000000000000000000000000000000000000..05e89fd847354671f733d303f199296b0c23a330
 --- /dev/null
 +++ b/src/test/java/io/papermc/paper/plugin/TestPluginConfiguration.java
 @@ -0,0 +1,114 @@
@@ -5511,7 +5512,7 @@ index 0000000000000000000000000000000000000000..f4d0eda6d9fe9e5b457a39efd4a37039
 +    }
 +
 +    @Override
-+    public @NotNull List<String> getProvides() {
++    public @NotNull List<String> getProvidedPlugins() {
 +        return List.of();
 +    }
 +
