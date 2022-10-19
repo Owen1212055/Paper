@@ -1244,10 +1244,10 @@ index 0000000000000000000000000000000000000000..ce66c664003e80087df88bded37ef17b
 +}
 diff --git a/src/main/java/io/papermc/paper/registry/RegistryDebugging.java b/src/main/java/io/papermc/paper/registry/RegistryDebugging.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..effc53d19c3955d04529fd36710f74815545381c
+index 0000000000000000000000000000000000000000..9b17d76323eee6505b5fe66ab752a4326c0cb51b
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/registry/RegistryDebugging.java
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,18 @@
 +package io.papermc.paper.registry;
 +
 +import org.jetbrains.annotations.ApiStatus;
@@ -1263,6 +1263,8 @@ index 0000000000000000000000000000000000000000..effc53d19c3955d04529fd36710f7481
 +    public abstract void debugAddChatType();
 +
 +    public abstract void debugAddMemory();
++
++    public abstract void finallyDebug();
 +}
 diff --git a/src/main/java/org/bukkit/command/PluginCommand.java b/src/main/java/org/bukkit/command/PluginCommand.java
 index 1dbbc244309043b18c1d71707c4fb066c0d0e02d..08d3ff24d5318b0c77d6467bcb705bffac202842 100644

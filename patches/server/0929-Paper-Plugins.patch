@@ -4806,10 +4806,10 @@ index 0000000000000000000000000000000000000000..e856f7900026e508a1076c28ccace58a
 +
 diff --git a/src/main/java/io/papermc/paper/registry/RegistryDebuggingImpl.java b/src/main/java/io/papermc/paper/registry/RegistryDebuggingImpl.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..872f17c508d6d94cec7390241058c1f120236f05
+index 0000000000000000000000000000000000000000..e7829735095175d3e15f2a7778ee6da91b2a7ce4
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/registry/RegistryDebuggingImpl.java
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,55 @@
 +package io.papermc.paper.registry;
 +
 +import net.minecraft.core.Registry;
@@ -4829,6 +4829,11 @@ index 0000000000000000000000000000000000000000..872f17c508d6d94cec7390241058c1f1
 +import java.util.OptionalLong;
 +
 +public class RegistryDebuggingImpl extends RegistryDebugging {
++
++    private static final ResourceLocation DIMENSION_NEW = new ResourceLocation("debugger:dimension_new");
++    private static final ResourceLocation CHAT_NEW = new ResourceLocation("debugger:chat_new");
++    private static final ResourceLocation MEMORY = new ResourceLocation("debugger:memory_new");
++
 +    public static void init() {
 +        RegistryDebugging.INSTANCE = new RegistryDebuggingImpl();
 +    }
@@ -4836,21 +4841,28 @@ index 0000000000000000000000000000000000000000..872f17c508d6d94cec7390241058c1f1
 +    @Override
 +    public void debugAddDimension() {
 +        BuiltinRegistries.register(BuiltinRegistries.DIMENSION_TYPE,
-+            new ResourceLocation("debugger:dimension_new"),
++            DIMENSION_NEW,
 +            new DimensionType(OptionalLong.empty(), true, false, false, true, 1.0D, true, false, -64, 384, 384, BlockTags.INFINIBURN_OVERWORLD, BuiltinDimensionTypes.OVERWORLD_EFFECTS, 0.0F, new DimensionType.MonsterSettings(false, true, UniformInt.of(0, 7), 0)));
 +    }
 +
 +    @Override
 +    public void debugAddChatType() {
 +        BuiltinRegistries.register(BuiltinRegistries.CHAT_TYPE,
-+            new ResourceLocation("debugger:chat_new"),
++            CHAT_NEW,
 +            new ChatType(ChatTypeDecoration.outgoingDirectMessage("commands.message.display.outgoing"),
 +                ChatTypeDecoration.withSender("chat.type.text.narrate")));
 +    }
 +
 +    @Override
 +    public void debugAddMemory() {
-+        Registry.register(Registry.MEMORY_MODULE_TYPE, new ResourceLocation("debugger:memory_new"), new MemoryModuleType<>(Optional.empty()));
++        Registry.register(Registry.MEMORY_MODULE_TYPE, MEMORY, new MemoryModuleType<>(Optional.empty()));
++    }
++
++    @Override
++    public void finallyDebug() {
++        System.out.println(BuiltinRegistries.DIMENSION_TYPE.get(DIMENSION_NEW));
++        System.out.println(BuiltinRegistries.CHAT_TYPE.get(CHAT_NEW));
++        System.out.println(Registry.MEMORY_MODULE_TYPE.get(MEMORY));
 +    }
 +}
 diff --git a/src/main/java/net/minecraft/server/Bootstrap.java b/src/main/java/net/minecraft/server/Bootstrap.java
