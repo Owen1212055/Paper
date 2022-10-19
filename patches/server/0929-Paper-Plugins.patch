@@ -18,6 +18,7 @@ These patches (will) be merged into this as this PR removes the usages of the fi
 - Automatically disable plugins that fail to load (Aikar <aikar@aikar.co>)
 - Add an asterisk to legacy API plugins (Phoenix616 <max@themoep.de>)
 - Make /plugins list alphabetical (BillyGalbreath <Blake.Galbreath@GMail.com>)
+- Also load resources from LibraryLoader (Nick Hensel <nickhensel25@icloud.com>)
 
 PATCHES TO MODIFY:
 - Add command line option to load extra plugin jars not in the plugins folder (Jason Penilla <11360596+jpenilla@users.noreply.github.com>)
@@ -2396,10 +2397,10 @@ index 0000000000000000000000000000000000000000..97fe93ef816f9b79ee1f0bf838587325
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..e3e965c6ec2a9a18f44a256c0822dab549441b4b
+index 0000000000000000000000000000000000000000..66a4e7b012ae571e7020957645b1b4f82ce925bf
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/service/classloader/PaperPluginClassLoader.java
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,181 @@
 +package io.papermc.paper.plugin.provider.service.classloader;
 +
 +import io.papermc.paper.plugin.DependencyContext;
@@ -2414,7 +2415,12 @@ index 0000000000000000000000000000000000000000..e3e965c6ec2a9a18f44a256c0822dab5
 +import java.io.IOException;
 +import java.net.URL;
 +import java.nio.file.Path;
-+import java.util.*;
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.Enumeration;
++import java.util.List;
++import java.util.Map;
++import java.util.Set;
 +import java.util.concurrent.ConcurrentHashMap;
 +import java.util.jar.JarFile;
 +import java.util.logging.Logger;
@@ -2446,12 +2452,27 @@ index 0000000000000000000000000000000000000000..e3e965c6ec2a9a18f44a256c0822dab5
 +
 +    @Override
 +    public URL getResource(String name) {
-+        return this.findResource(name);
++        URL resource = findResource(name);
++        if (resource == null && this.libraryLoader != null) {
++            return this.libraryLoader.getResource(name);
++        }
++        return resource;
 +    }
 +
 +    @Override
 +    public Enumeration<URL> getResources(String name) throws IOException {
-+        return this.findResources(name);
++        List<URL> resources = new ArrayList<>();
++        this.addEnumeration(resources, this.findResources(name));
++        if (this.libraryLoader != null) {
++            addEnumeration(resources, this.libraryLoader.getResources(name));
++        }
++        return Collections.enumeration(resources);
++    }
++
++    private <T> void addEnumeration(List<T> list, Enumeration<T> enumeration) {
++        while (enumeration.hasMoreElements()) {
++            list.add(enumeration.nextElement());
++        }
 +    }
 +
 +    @Override
@@ -2486,7 +2507,7 @@ index 0000000000000000000000000000000000000000..e3e965c6ec2a9a18f44a256c0822dab5
 +
 +        if (checkGlobal) {
 +            // This ignores the libraries of other plugins, unless they are transitive dependencies.
-+            Class<?> result = this.loader.getClassByName(name, resolve, this.configuration, this);  // Paper - prioritize self
++            Class<?> result = this.loader.getClassByName(name, resolve, this.configuration, this);
 +
 +            if (result != null) {
 +                // If the class was loaded from a library instead of a PluginClassLoader, we can assume that its associated plugin is a transitive dependency and can therefore skip this check.
@@ -2539,7 +2560,7 @@ index 0000000000000000000000000000000000000000..e3e965c6ec2a9a18f44a256c0822dab5
 +        File dataFolder = new File(Bukkit.getPluginsFolder(), pluginDescriptionFile.getName());
 +        PaperPluginClassLoaderStorage.INSTANCE.add(this);
 +        plugin.init(Bukkit.getServer(), pluginDescriptionFile, dataFolder, this.source.toFile(), this, config);
-+        plugin.logger = this.logger; // Paper - set logger
++        plugin.logger = this.logger;
 +    }
 +
 +    @Override
