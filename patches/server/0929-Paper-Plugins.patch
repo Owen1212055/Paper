@@ -4089,20 +4089,32 @@ index 0000000000000000000000000000000000000000..b07379af27b53cd9ab0e9db1e444d2dd
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/source/impl/FileProviderSource.java b/src/main/java/io/papermc/paper/plugin/provider/source/impl/FileProviderSource.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..02b98fd9895cce0cd68113937c3c0d9d4457640d
+index 0000000000000000000000000000000000000000..2c046387611c66f69956117bc8f527ab7f2854b4
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/source/impl/FileProviderSource.java
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,156 @@
 +package io.papermc.paper.plugin.provider.source.impl;
 +
++import io.papermc.paper.plugin.provider.PluginProvider;
 +import io.papermc.paper.plugin.provider.service.entrypoint.EntrypointHandler;
 +import io.papermc.paper.plugin.provider.source.ProviderSource;
 +import io.papermc.paper.plugin.provider.type.PluginFileType;
++import net.minecraft.server.Main;
++import org.bukkit.plugin.InvalidPluginException;
++import org.jetbrains.annotations.Nullable;
 +
++import java.io.File;
++import java.io.IOException;
++import java.nio.file.FileVisitResult;
++import java.nio.file.FileVisitor;
 +import java.nio.file.Files;
 +import java.nio.file.Path;
++import java.nio.file.StandardCopyOption;
++import java.nio.file.attribute.BasicFileAttributes;
++import java.util.Set;
 +import java.util.jar.JarFile;
 +
++// TODO: We need to add update file logic
 +public class FileProviderSource implements ProviderSource<Path> {
 +
 +    private final boolean addPluginProvider;
@@ -4129,6 +4141,8 @@ index 0000000000000000000000000000000000000000..02b98fd9895cce0cd68113937c3c0d9d
 +        }
 +
 +        try {
++            this.checkUpdate(context);
++
 +            JarFile file = new JarFile(context.toFile());
 +            PluginFileType<?> type = PluginFileType.guessType(file);
 +            if (type == null) {
@@ -4139,6 +4153,100 @@ index 0000000000000000000000000000000000000000..02b98fd9895cce0cd68113937c3c0d9d
 +        } catch (Exception exception) {
 +            throw new RuntimeException(source + " failed to load!", exception);
 +        }
++    }
++
++    /**
++     * Replaces a plugin with a plugin of the same plugin name in the update folder.
++     *
++     * @param file
++     */
++    private Path checkUpdate(Path file) throws Exception {
++        if (!Files.isDirectory(Main.updateDirectory)) {
++            return file;
++        }
++
++        try {
++            String pluginName = this.getPluginName(file);
++            UpdateFileVisitor visitor = new UpdateFileVisitor(pluginName);
++            Files.walkFileTree(Main.updateDirectory, Set.of(), 1, visitor);
++            if (visitor.getValidPlugin() != null) {
++                Path updateLocation = visitor.getValidPlugin();
++
++                try {
++                    Files.copy(updateLocation, file, StandardCopyOption.REPLACE_EXISTING);
++                } catch (IOException exception) {
++                    throw new RuntimeException("Could not copy '" + updateLocation + "' to '" + file + "' in update plugin process", exception);
++                }
++
++                // Idk what this is about, TODO
++                File newName = new File(file.toFile().getParentFile(), updateLocation.toFile().getName());
++                file.toFile().renameTo(newName);
++                updateLocation.toFile().delete();
++            }
++        } catch (Exception e) {
++            throw new InvalidPluginException(e);
++        }
++        return file;
++    }
++
++
++    private class UpdateFileVisitor implements FileVisitor<Path> {
++
++        private final String targetName;
++        @Nullable
++        private Path validPlugin;
++
++        private UpdateFileVisitor(String targetName) {
++            this.targetName = targetName;
++        }
++
++        @Override
++        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
++            return FileVisitResult.CONTINUE;
++        }
++
++        @Override
++        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
++            try {
++                String updatePluginName = FileProviderSource.this.getPluginName(file);
++                if (this.targetName.equals(updatePluginName)) {
++                    this.validPlugin = file;
++                    return FileVisitResult.TERMINATE;
++                }
++            } catch (Exception e) {
++                // We failed to load this data for some reason, so, we'll skip over this
++            }
++
++
++            return FileVisitResult.CONTINUE;
++        }
++
++        @Override
++        public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
++            return FileVisitResult.CONTINUE;
++        }
++
++        @Override
++        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
++            return FileVisitResult.CONTINUE;
++        }
++
++        @Nullable
++        public Path getValidPlugin() {
++            return validPlugin;
++        }
++    }
++
++
++    private String getPluginName(Path path) throws Exception {
++        JarFile file = new JarFile(path.toFile());
++        PluginFileType<?> type = PluginFileType.guessType(file);
++        if (type == null) {
++            throw new IllegalArgumentException(path + " is not a valid plugin file, cannot load a plugin from it!");
++        }
++
++        PluginProvider<?> factory = type.getProvider(file, path);
++        return factory.getConfiguration().getIdentifier();
 +    }
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/source/impl/PluginFlagProviderSource.java b/src/main/java/io/papermc/paper/plugin/provider/source/impl/PluginFlagProviderSource.java
@@ -4189,10 +4297,10 @@ index 0000000000000000000000000000000000000000..c7b16e25a140e51ef4dfbba3d036acf6
 +}
 diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java b/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..069fcbe0ab83f6fbb04c752344a5b6377baded44
+index 0000000000000000000000000000000000000000..7bb1ad0543d1f31e0a3a6fea6686588ea9577168
 --- /dev/null
 +++ b/src/main/java/io/papermc/paper/plugin/provider/type/PluginFileType.java
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,72 @@
 +package io.papermc.paper.plugin.provider.type;
 +
 +import io.papermc.paper.plugin.provider.PluginProvider;
@@ -4254,9 +4362,13 @@ index 0000000000000000000000000000000000000000..069fcbe0ab83f6fbb04c752344a5b637
 +    }
 +
 +    public T register(EntrypointHandler entrypointHandler, JarFile file, Path context) throws Exception {
-+        T provider = this.factory.build(file, file.getJarEntry(this.config), context);
++        T provider = this.getProvider(file, context);
 +        this.register(entrypointHandler, provider);
 +        return provider;
++    }
++
++    public T getProvider(JarFile file, Path context) throws Exception {
++        return this.factory.build(file, file.getJarEntry(this.config), context);
 +    }
 +
 +    protected abstract void register(EntrypointHandler entrypointHandler, T provider);
@@ -4878,30 +4990,41 @@ index 0ece775ca7e63184f79fcdd1aa7ed5c16fc9bc9e..ee18584c3cf6aa08e8a4eb41f62875ad
                      Bootstrap.wrapStreams();
                  }
 diff --git a/src/main/java/net/minecraft/server/Main.java b/src/main/java/net/minecraft/server/Main.java
-index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..84aabd86e07fb8ed5992c43c6ae0d0a9e2a04abd 100644
+index 5962f7a2b185d7d54a0f9e341a4fdf6e6f1c1ec5..e840bd43664ff911be942a3358854b5916d350a5 100644
 --- a/src/main/java/net/minecraft/server/Main.java
 +++ b/src/main/java/net/minecraft/server/Main.java
-@@ -68,6 +68,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
+@@ -68,6 +68,10 @@ import org.bukkit.configuration.file.YamlConfiguration;
  public class Main {
  
      private static final Logger LOGGER = LogUtils.getLogger();
++    // Paper start
 +    public static Path pluginDirectory;
++    public static Path updateDirectory;
++    // Paper end
  
      public Main() {}
  
-@@ -108,6 +109,17 @@ public class Main {
+@@ -108,6 +112,25 @@ public class Main {
                  JvmProfiler.INSTANCE.start(Environment.SERVER);
              }
  
 +            // Paper start
++
++            // We have to load the bukkit configuration inorder to get the update folder location.
 +            io.papermc.paper.plugin.provider.source.Providers provider = io.papermc.paper.plugin.provider.source.Providers.INSTANCE;
-+            File pluginfile = (File) optionset.valueOf("plugins");
-+            provider.addProviders(io.papermc.paper.plugin.provider.source.impl.DirectoryProviderSource.INSTANCE, pluginfile.toPath());
++            File configFileLocationBukkit = (File) optionset.valueOf("bukkit-settings");
++            pluginDirectory = ((File) optionset.valueOf("plugins")).toPath();
++            updateDirectory = pluginDirectory.resolve(YamlConfiguration.loadConfiguration(configFileLocationBukkit).getString("settings.update-folder", "update"));
++
++            // Register the default plugin directory
++            provider.addProviders(io.papermc.paper.plugin.provider.source.impl.DirectoryProviderSource.INSTANCE, pluginDirectory);
 +
 +            @SuppressWarnings("unchecked")
 +            java.util.List<File> files = (java.util.List<File>) optionset.valuesOf("add-plugin");
++            // Register plugins from the flag
 +            provider.addProviders(io.papermc.paper.plugin.provider.source.impl.PluginFlagProviderSource.INSTANCE, files);
-+            pluginDirectory = pluginfile.toPath();
++
++            // Debug
 +            io.papermc.paper.registry.RegistryDebuggingImpl.init();
 +            // Paper end
              Bootstrap.bootStrap();
