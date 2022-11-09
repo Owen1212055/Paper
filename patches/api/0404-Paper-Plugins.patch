@@ -1220,52 +1220,6 @@ index 0000000000000000000000000000000000000000..06fb087e8ee7f28b638a9f8819d3a0d2
 +    }
 +
 +}
-diff --git a/src/main/java/io/papermc/paper/registry/RegistryAccess.java b/src/main/java/io/papermc/paper/registry/RegistryAccess.java
-new file mode 100644
-index 0000000000000000000000000000000000000000..ce66c664003e80087df88bded37ef17bd398bf85
---- /dev/null
-+++ b/src/main/java/io/papermc/paper/registry/RegistryAccess.java
-@@ -0,0 +1,16 @@
-+package io.papermc.paper.registry;
-+
-+import org.jetbrains.annotations.NotNull;
-+
-+public class RegistryAccess {
-+
-+    /**
-+     * Stub
-+     *
-+     * @return
-+     */
-+    @NotNull
-+    public static RegistryAccess getInstance() {
-+        return new RegistryAccess();
-+    }
-+}
-diff --git a/src/main/java/io/papermc/paper/registry/RegistryDebugging.java b/src/main/java/io/papermc/paper/registry/RegistryDebugging.java
-new file mode 100644
-index 0000000000000000000000000000000000000000..9b17d76323eee6505b5fe66ab752a4326c0cb51b
---- /dev/null
-+++ b/src/main/java/io/papermc/paper/registry/RegistryDebugging.java
-@@ -0,0 +1,18 @@
-+package io.papermc.paper.registry;
-+
-+import org.jetbrains.annotations.ApiStatus;
-+
-+// Remove later
-+@ApiStatus.Internal
-+public abstract class RegistryDebugging {
-+
-+    public static RegistryDebugging INSTANCE = null;
-+
-+    public abstract void debugAddDimension();
-+
-+    public abstract void debugAddChatType();
-+
-+    public abstract void debugAddMemory();
-+
-+    public abstract void finallyDebug();
-+}
 diff --git a/src/main/java/org/bukkit/command/PluginCommand.java b/src/main/java/org/bukkit/command/PluginCommand.java
 index 1dbbc244309043b18c1d71707c4fb066c0d0e02d..08d3ff24d5318b0c77d6467bcb705bffac202842 100644
 --- a/src/main/java/org/bukkit/command/PluginCommand.java
@@ -1280,7 +1234,7 @@ index 1dbbc244309043b18c1d71707c4fb066c0d0e02d..08d3ff24d5318b0c77d6467bcb705bff
          this.executor = owner;
          this.owningPlugin = owner;
 diff --git a/src/main/java/org/bukkit/command/SimpleCommandMap.java b/src/main/java/org/bukkit/command/SimpleCommandMap.java
-index b8623575b1c1b565560c2dd6438190716845a652..785952d60df7c0ab7b247ba81d1970b5a90e5340 100644
+index b8623575b1c1b565560c2dd6438190716845a652..d2d8738329c47a23c47d86689d26957b2da60bc7 100644
 --- a/src/main/java/org/bukkit/command/SimpleCommandMap.java
 +++ b/src/main/java/org/bukkit/command/SimpleCommandMap.java
 @@ -33,7 +33,7 @@ public class SimpleCommandMap implements CommandMap {
@@ -1288,24 +1242,15 @@ index b8623575b1c1b565560c2dd6438190716845a652..785952d60df7c0ab7b247ba81d1970b5
          register("bukkit", new VersionCommand("version"));
          register("bukkit", new ReloadCommand("reload"));
 -        register("bukkit", new PluginsCommand("plugins"));
-+        //register("bukkit", new PluginsCommand("plugins")); Paper
++        // Paper - Replace with our own plugins command
          register("bukkit", new co.aikar.timings.TimingsCommand("timings")); // Paper
      }
  
 diff --git a/src/main/java/org/bukkit/plugin/Plugin.java b/src/main/java/org/bukkit/plugin/Plugin.java
-index 08aef59d8443038771704d9587e31f299e587307..ef3d1b9cf93903d50f11d3504ee5a6526cc6cc08 100644
+index 08aef59d8443038771704d9587e31f299e587307..032044bc28eaab17148be27b9b4bdc08a7ec9524 100644
 --- a/src/main/java/org/bukkit/plugin/Plugin.java
 +++ b/src/main/java/org/bukkit/plugin/Plugin.java
-@@ -3,6 +3,8 @@ package org.bukkit.plugin;
- import java.io.File;
- import java.io.InputStream;
- import java.util.logging.Logger;
-+
-+import io.papermc.paper.plugin.configuration.PluginConfiguration;
- import org.bukkit.Server;
- import org.bukkit.command.TabExecutor;
- import org.bukkit.configuration.file.FileConfiguration;
-@@ -30,10 +32,20 @@ public interface Plugin extends TabExecutor {
+@@ -30,10 +30,20 @@ public interface Plugin extends TabExecutor {
       * Returns the plugin.yaml file containing the details for this plugin
       *
       * @return Contents of the plugin.yaml file
@@ -1321,12 +1266,12 @@ index 08aef59d8443038771704d9587e31f299e587307..ef3d1b9cf93903d50f11d3504ee5a652
 +     * @return configuration
 +     */
 +    @NotNull
-+    PluginConfiguration getConfiguration();
++    io.papermc.paper.plugin.configuration.PluginConfiguration getConfiguration();
 +
      /**
       * Gets a {@link FileConfiguration} for this plugin, read through
       * "config.yml"
-@@ -92,8 +104,10 @@ public interface Plugin extends TabExecutor {
+@@ -92,8 +102,10 @@ public interface Plugin extends TabExecutor {
      /**
       * Gets the associated PluginLoader responsible for this plugin
       *
