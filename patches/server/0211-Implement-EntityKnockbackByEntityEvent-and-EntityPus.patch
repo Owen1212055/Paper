@@ -109,7 +109,7 @@ index 61328cde67c994c4ec0629b5869a878eda7c6cab..9b64a465be77bcc07e420c84f19fe758
              world.playSound((Player)null, entity, this.getImpactSound.apply(entity), SoundSource.NEUTRAL, 1.0F, 1.0F);
          } else if (this.hasRammedHornBreakingBlock(world, entity)) {
 diff --git a/src/main/java/net/minecraft/world/entity/ai/behavior/warden/SonicBoom.java b/src/main/java/net/minecraft/world/entity/ai/behavior/warden/SonicBoom.java
-index c8c5a46f526b3f8823b3c2047463c2e67f12c92e..3ab9782621adfa76f44f690d51edb7ae18b40f9e 100644
+index c8c5a46f526b3f8823b3c2047463c2e67f12c92e..27aea5c5e284767a2a9b7de1b7912c3d50ff3c3c 100644
 --- a/src/main/java/net/minecraft/world/entity/ai/behavior/warden/SonicBoom.java
 +++ b/src/main/java/net/minecraft/world/entity/ai/behavior/warden/SonicBoom.java
 @@ -69,7 +69,7 @@ public class SonicBoom extends Behavior<Warden> {
@@ -117,7 +117,7 @@ index c8c5a46f526b3f8823b3c2047463c2e67f12c92e..3ab9782621adfa76f44f690d51edb7ae
                  double d = 0.5D * (1.0D - target.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE));
                  double e = 2.5D * (1.0D - target.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE));
 -                target.push(vec33.x() * e, vec33.y() * d, vec33.z() * e);
-+                target.push(vec33.x() * e, vec33.y() * d, vec33.z() * e, warden); // Paper
++                target.push(vec33.x() * e, vec33.y() * d, vec33.z() * e, entity); // Paper
              });
          }
      }
