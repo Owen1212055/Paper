@@ -32,11 +32,11 @@ index 82b267898f98b7e6c808a2377951106769a4a763..e609a52750fe6ca178ce2933510d000a
      private final String bukkitVersion = Versioning.getBukkitVersion();
      private final Logger logger = Logger.getLogger("Minecraft");
 diff --git a/src/main/java/org/bukkit/craftbukkit/Main.java b/src/main/java/org/bukkit/craftbukkit/Main.java
-index a51581263f1c9d72aab7c9223a816d034630f702..d453c630da1780a7aeab80cf95adcee62f4e8a14 100644
+index c6b04971733b2a26f287e0fa7bf74316c8cc48f2..0be441eef296ebf301d086edaf8dc3d0e107a025 100644
 --- a/src/main/java/org/bukkit/craftbukkit/Main.java
 +++ b/src/main/java/org/bukkit/craftbukkit/Main.java
 @@ -223,12 +223,25 @@ public class Main {
-                     deadline.add(Calendar.DAY_OF_YEAR, -14);
+                     deadline.add(Calendar.DAY_OF_YEAR, -7);
                      if (buildDate.before(deadline.getTime())) {
                          System.err.println("*** Error, this build is outdated ***");
 -                        System.err.println("*** Please download a new build as per instructions from https://www.spigotmc.org/go/outdated-spigot ***");
