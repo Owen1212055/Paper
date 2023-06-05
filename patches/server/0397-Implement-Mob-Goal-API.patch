@@ -4,18 +4,6 @@ Date: Fri, 3 Jan 2020 16:26:19 +0100
 Subject: [PATCH] Implement Mob Goal API
 
 
-diff --git a/build.gradle.kts b/build.gradle.kts
-index e63ad0e49818709cb292b9e43f5b52f5cb13002f..719f4b4bff2ab651156f17e27412ae8b0e9e5d02 100644
---- a/build.gradle.kts
-+++ b/build.gradle.kts
-@@ -36,6 +36,7 @@ dependencies {
-     runtimeOnly("org.apache.maven.resolver:maven-resolver-connector-basic:1.7.3")
-     runtimeOnly("org.apache.maven.resolver:maven-resolver-transport-http:1.7.3")
- 
-+    testImplementation("io.github.classgraph:classgraph:4.8.47") // Paper - mob goal test
-     testImplementation("junit:junit:4.13.2")
-     testImplementation("org.hamcrest:hamcrest-library:1.3")
- 
 diff --git a/src/main/java/com/destroystokyo/paper/entity/ai/MobGoalHelper.java b/src/main/java/com/destroystokyo/paper/entity/ai/MobGoalHelper.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..f80a6ad7638453348ee82ea00b166a3aac029142

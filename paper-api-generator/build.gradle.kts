@@ -13,7 +13,7 @@ minecraft {
         server("generate") {
             mainClass("io.papermc.generator.Main")
             accessWideners(projectDir.toPath().resolve("wideners.at"))
-            args(projectDir.toPath().resolve("generated").toString())
+            args(projectDir.toPath().resolve("generated-api").toString(), projectDir.toPath().resolve("generated-server").toString())
         }
     }
 }
@@ -21,6 +21,7 @@ minecraft {
 dependencies {
     implementation("com.squareup:javapoet:1.13.0")
     implementation(project(":paper-api"))
+    implementation("io.github.classgraph:classgraph:4.8.47")
 }
 
 group = "io.papermc.paper"

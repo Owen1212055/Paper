@@ -6,7 +6,7 @@ Subject: [PATCH] Deobfuscate stacktraces in log messages, crash reports, and
 
 
 diff --git a/build.gradle.kts b/build.gradle.kts
-index c04f733d053a52218893ef2b9ca050f911b50b0a..e63ad0e49818709cb292b9e43f5b52f5cb13002f 100644
+index 2c6e0551540f225c3e2ae6a1e3eb44934c70d85f..c2baeedd62fafd6ff912331fcd64a3a230cee228 100644
 --- a/build.gradle.kts
 +++ b/build.gradle.kts
 @@ -19,6 +19,7 @@ dependencies {
@@ -25,7 +25,7 @@ index c04f733d053a52218893ef2b9ca050f911b50b0a..e63ad0e49818709cb292b9e43f5b52f5
      runtimeOnly("org.xerial:sqlite-jdbc:3.41.2.2")
      runtimeOnly("com.mysql:mysql-connector-j:8.0.32")
      runtimeOnly("com.lmax:disruptor:3.4.4") // Paper
-@@ -105,6 +107,18 @@ tasks.check {
+@@ -106,6 +108,18 @@ tasks.check {
  }
  // Paper end
  

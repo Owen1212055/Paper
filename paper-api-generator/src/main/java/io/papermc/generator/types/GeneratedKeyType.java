@@ -42,18 +42,11 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 
 @DefaultQualifier(NonNull.class)
-public class GeneratedKeyType<T> implements SourceGenerator {
+public class GeneratedKeyType<T> extends SimpleGenerator {
 
     private static final Map<ResourceKey<? extends Registry<?>>, RegistrySetBuilder.RegistryBootstrap<?>> EXPERIMENTAL_REGISTRY_ENTRIES = UpdateOneTwentyRegistries.BUILDER.entries.stream()
             .collect(Collectors.toMap(RegistrySetBuilder.RegistryStub::key, RegistrySetBuilder.RegistryStub::bootstrap));
 
-    private static final AnnotationSpec SUPPRESS_WARNINGS = AnnotationSpec.builder(SuppressWarnings.class)
-        .addMember("value", "$S", "unused")
-        .addMember("value", "$S", "SpellCheckingInspection")
-        .build();
-    private static final AnnotationSpec GENERATED_FROM = AnnotationSpec.builder(ClassName.get("io.papermc.paper.generated", "GeneratedFrom"))
-        .addMember("value", "$S", SharedConstants.getCurrentVersion().getName())
-        .build();
     private static final String CREATE_JAVADOC = """
         Creates a key for {@link $T} in a registry.
         
@@ -61,17 +54,14 @@ public class GeneratedKeyType<T> implements SourceGenerator {
         @return a new typed key
         """;
 
-    private final String keysClassName;
     private final Class<?> apiType;
-    private final String pkg;
     private final ResourceKey<? extends Registry<T>> registryKey;
     private final String apiRegistryKey;
     private final boolean publicCreateKeyMethod;
 
     public GeneratedKeyType(final String keysClassName, final Class<? extends Keyed> apiType, final String pkg, final ResourceKey<? extends Registry<T>> registryKey, final String apiRegistryKey, final boolean publicCreateKeyMethod) {
-        this.keysClassName = keysClassName;
+        super(keysClassName, pkg);
         this.apiType = apiType;
-        this.pkg = pkg;
         this.registryKey = registryKey;
         this.apiRegistryKey = apiRegistryKey;
         this.publicCreateKeyMethod = publicCreateKeyMethod;
@@ -93,17 +83,18 @@ public class GeneratedKeyType<T> implements SourceGenerator {
     }
 
     private TypeSpec.Builder keyHolderType() {
-        return classBuilder(this.keysClassName)
+        return classBuilder(this.className)
             .addModifiers(PUBLIC, FINAL)
             .addJavadoc("Vanilla keys for {@link $T}.", this.apiType)
-            .addAnnotation(SUPPRESS_WARNINGS).addAnnotation(GENERATED_FROM)
+            .addAnnotations(Annotations.CLASS_HEADER)
             .addMethod(MethodSpec.constructorBuilder()
                 .addModifiers(PRIVATE)
                 .build()
             );
     }
 
-    protected TypeSpec createTypeSpec() {
+    @Override
+    protected TypeSpec getTypeSpec() {
         final TypeName typedKey = ParameterizedTypeName.get(TypedKey.class, this.apiType);
 
         final TypeSpec.Builder typeBuilder = this.keyHolderType();
@@ -146,23 +137,10 @@ public class GeneratedKeyType<T> implements SourceGenerator {
         return experimental;
     }
 
-    protected JavaFile createFile() {
-        return JavaFile.builder(this.pkg, this.createTypeSpec())
+    @Override
+    protected JavaFile.Builder file(JavaFile.Builder builder) {
+        return builder
             .skipJavaLangImports(true)
-            .addStaticImport(Key.class, "key")
-            .indent("    ")
-            .build();
-    }
-
-    @Override
-    public final String outputString() {
-        return this.createFile().toString();
-    }
-
-    @Override
-    public void writeToFile(final Path parent) throws IOException {
-        final Path pkgDir = parent.resolve(this.pkg.replace('.', '/'));
-        Files.createDirectories(pkgDir);
-        Files.writeString(pkgDir.resolve(this.keysClassName + ".java"), this.outputString(), StandardCharsets.UTF_8);
+            .addStaticImport(Key.class, "key");
     }
 }
