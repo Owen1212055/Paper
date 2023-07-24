@@ -1,0 +1,22 @@
+name: Handle PR Queue
+
+
+on:
+  merge_group:
+    types: [ checks_requested ]
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get all test, doc and src files that have changed
+        id: changed-files-yaml
+        uses: tj-actions/changed-files@v37
+        with:
+          files: |
+            patches/server
+            patches/api
+
+      - name: Test for renames
+        run: |
+         echo "List all the files that have changed: ${{ steps.changed-files-yaml.outputs }}"
