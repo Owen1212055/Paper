@@ -1,9 +1,7 @@
 package io.papermc.paper.connection;
 
 import org.bukkit.entity.Player;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public interface PlayerGameConnection extends PlayerCommonConnection {
 
     /**
@@ -20,5 +18,4 @@ public interface PlayerGameConnection extends PlayerCommonConnection {
      * @return player
      */
     Player getPlayer();
-
 }

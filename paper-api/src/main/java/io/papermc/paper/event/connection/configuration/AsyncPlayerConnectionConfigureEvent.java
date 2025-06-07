@@ -3,7 +3,6 @@ package io.papermc.paper.event.connection.configuration;
 import io.papermc.paper.connection.PlayerConfigurationConnection;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * A task that allows you to configurate the player.
@@ -13,21 +12,19 @@ import org.jetbrains.annotations.NotNull;
  * This occurs after configuration, but before the player has entered the world.
  */
 public class AsyncPlayerConnectionConfigureEvent extends PlayerConfigurationConnectionEvent {
-    private static final HandlerList handlers = new HandlerList();
+    private static final HandlerList HANDLER_LIST = new HandlerList();
 
     @ApiStatus.Internal
-    public AsyncPlayerConnectionConfigureEvent(PlayerConfigurationConnection connection) {
+    public AsyncPlayerConnectionConfigureEvent(final PlayerConfigurationConnection connection) {
         super(true, connection);
     }
 
-    @NotNull
     @Override
     public HandlerList getHandlers() {
-        return handlers;
+        return HANDLER_LIST;
     }
 
-    @NotNull
     public static HandlerList getHandlerList() {
-        return handlers;
+        return HANDLER_LIST;
     }
 }

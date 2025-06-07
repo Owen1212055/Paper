@@ -1,16 +1,11 @@
 package io.papermc.paper.event.connection.common;
 
-import io.papermc.paper.connection.PlayerConfigurationConnection;
 import io.papermc.paper.connection.PlayerConnection;
-import io.papermc.paper.connection.PlayerLoginConnection;
 import net.kyori.adventure.text.Component;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.NotNull;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import java.util.Objects;
 
 /**
  * Called when a player's connection phase is effectively "finished", meaning
@@ -18,23 +13,22 @@ import java.util.Objects;
  * <p>
  * Currently fires during the login and configuration protocol.
  */
-@NullMarked
 public class PlayerFinishConnectionPhaseEvent extends Event {
-    private static final HandlerList handlers = new HandlerList();
 
-    private PlayerConnection currentConnection;
+    private static final HandlerList HANDLER_LIST = new HandlerList();
 
-    @Nullable
-    private Component kickMessage;
+    private final PlayerConnection currentConnection;
+    private @Nullable Component kickMessage;
 
     @ApiStatus.Internal
-    public PlayerFinishConnectionPhaseEvent(PlayerConnection connection) {
+    public PlayerFinishConnectionPhaseEvent(final PlayerConnection connection) {
         super(false);
         this.currentConnection = connection;
     }
 
     /**
      * Gets the current connection.
+     *
      * @return connection
      */
     public PlayerConnection getCurrentConnection() {
@@ -46,7 +40,7 @@ public class PlayerFinishConnectionPhaseEvent extends Event {
      *
      * @param component reason
      */
-    public void deny(Component component) {
+    public void deny(final Component component) {
         this.kickMessage = component;
     }
 
@@ -68,21 +62,19 @@ public class PlayerFinishConnectionPhaseEvent extends Event {
 
     /**
      * Gets the kick message for this event, may be null
+     *
      * @return kick message
      */
-    @org.jetbrains.annotations.Nullable
-    public Component getKickMessage() {
+    public @Nullable Component getKickMessage() {
         return this.kickMessage;
     }
 
-    @NotNull
     @Override
     public HandlerList getHandlers() {
-        return handlers;
+        return HANDLER_LIST;
     }
 
-    @NotNull
     public static HandlerList getHandlerList() {
-        return handlers;
+        return HANDLER_LIST;
     }
 }

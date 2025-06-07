@@ -1,17 +1,14 @@
 package io.papermc.paper.connection;
 
+import com.destroystokyo.paper.ClientOption;
 import com.destroystokyo.paper.profile.PlayerProfile;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NullMarked;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 
-@NullMarked
 public interface PlayerConfigurationConnection extends PlayerCommonConnection {
 
     /**
      * Gets the profile for this connection.
+     *
      * @return profile
      */
     PlayerProfile getProfile();
@@ -25,6 +22,7 @@ public interface PlayerConfigurationConnection extends PlayerCommonConnection {
 
     /**
      * Gets the raw address of the player logging in
+     *
      * @return The address
      */
     InetAddress getRawAddress();
@@ -53,6 +51,6 @@ public interface PlayerConfigurationConnection extends PlayerCommonConnection {
      * @param type client option
      * @return the client option value of the player
      */
-    <T> T getClientOption(com.destroystokyo.paper.ClientOption<T> type);
+    <T> T getClientOption(ClientOption<T> type);
 
 }

@@ -4,24 +4,22 @@ import io.papermc.paper.connection.PlayerConfigurationConnection;
 import org.bukkit.Bukkit;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.NotNull;
 
 public class PlayerConnectionInitialConfigureEvent extends PlayerConfigurationConnectionEvent {
-    private static final HandlerList handlers = new HandlerList();
+
+    private static final HandlerList HANDLER_LIST = new HandlerList();
 
     @ApiStatus.Internal
-    public PlayerConnectionInitialConfigureEvent(PlayerConfigurationConnection connection) {
+    public PlayerConnectionInitialConfigureEvent(final PlayerConfigurationConnection connection) {
         super(!Bukkit.isPrimaryThread(), connection);
     }
 
-    @NotNull
     @Override
     public HandlerList getHandlers() {
-        return handlers;
+        return HANDLER_LIST;
     }
 
-    @NotNull
     public static HandlerList getHandlerList() {
-        return handlers;
+        return HANDLER_LIST;
     }
 }

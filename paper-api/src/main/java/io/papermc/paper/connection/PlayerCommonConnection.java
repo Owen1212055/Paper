@@ -1,24 +1,19 @@
 package io.papermc.paper.connection;
 
-import net.kyori.adventure.resource.ResourcePackRequest;
-import net.kyori.adventure.resource.ResourcePackRequestLike;
-import org.bukkit.ServerLinks;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.jspecify.annotations.NullMarked;
-
 import java.util.Map;
 import java.util.UUID;
+import net.kyori.adventure.resource.ResourcePackRequest;
+import org.bukkit.ServerLinks;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents a connection that has properties shared between the GAME and CONFIG stage.
  */
-@NullMarked
 public interface PlayerCommonConnection extends CookieConnection {
 
-    void sendResourcePacks(final @NotNull ResourcePackRequest request);
+    void sendResourcePacks(final ResourcePackRequest request);
 
-    void removeResourcePacks(final @NotNull UUID id, final @NotNull UUID... others);
+    void removeResourcePacks(final UUID id, final UUID... others);
 
     void clearResourcePacks();
 
@@ -36,6 +31,7 @@ public interface PlayerCommonConnection extends CookieConnection {
 
     /**
      * Sends the given server links to this connection.
+     *
      * @param links
      */
     void sendLinks(ServerLinks links);
@@ -51,8 +47,8 @@ public interface PlayerCommonConnection extends CookieConnection {
     /**
      * Gets the brand of this player.
      * It is generally expected that the brand will be available.
+     *
      * @return brand, or null if not present
      */
-    @Nullable
-    String getBrand();
+    @Nullable String getBrand();
 }
