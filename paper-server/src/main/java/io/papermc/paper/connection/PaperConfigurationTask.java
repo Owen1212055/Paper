@@ -22,7 +22,7 @@ public class PaperConfigurationTask implements ConfigurationTask {
 
     private final ServerConfigurationPacketListenerImpl serverConfigurationPacketListener;
 
-    public PaperConfigurationTask(ServerConfigurationPacketListenerImpl serverConfigurationPacketListener) {
+    public PaperConfigurationTask(final ServerConfigurationPacketListenerImpl serverConfigurationPacketListener) {
         this.serverConfigurationPacketListener = serverConfigurationPacketListener;
     }
 
@@ -33,7 +33,7 @@ public class PaperConfigurationTask implements ConfigurationTask {
             return;
         }
         CONFIGURATION_POOL.execute(() -> {
-            AsyncPlayerConnectionConfigureEvent event = new AsyncPlayerConnectionConfigureEvent(this.serverConfigurationPacketListener.paperConnection);
+            final AsyncPlayerConnectionConfigureEvent event = new AsyncPlayerConnectionConfigureEvent(this.serverConfigurationPacketListener.paperConnection);
             event.callEvent();
             this.serverConfigurationPacketListener.finishCurrentTask(TYPE);
         });

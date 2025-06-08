@@ -14,6 +14,7 @@ import net.minecraft.world.level.Level;
 import org.bukkit.craftbukkit.entity.CraftPlayer;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 // TODO: DO we even need this? Who mutates the player here? it does nothing anyways.
@@ -23,7 +24,7 @@ public class HorriblePlayerLoginEventHack {
     private static final Logger LOGGER = LogUtils.getClassLogger();
     private static boolean nagged = false;
 
-    public static Component execute(final Connection connection, MinecraftServer minecraftServer, GameProfile profile, @NotNull PlayerList.LoginResult result) {
+    public static @Nullable Component execute(final Connection connection, MinecraftServer minecraftServer, GameProfile profile, @NotNull PlayerList.LoginResult result) {
         if (PlayerLoginEvent.getHandlerList().getRegisteredListeners().length == 0) {
             return result.message();
         }
