@@ -328,7 +328,7 @@ index 7de11ba404f0b60e7f7b7c16954811a343688219..bd07e6a5aa1883786d789ea71711a0c0
                  LOGGER.warn("Using HAProxy, please ensure the server port is adequately firewalled.");
              }
              // Paper end - Warn people with console access that HAProxy is in use.
-+            // Paper start - Use Velocity cipher
++            // Paper start - Use Velocity cipher huge diff
 +            ServerConnectionListener.LOGGER.info("Paper: Using " + com.velocitypowered.natives.util.Natives.compress.getLoadedVariant() + " compression from Velocity.");
 +            ServerConnectionListener.LOGGER.info("Paper: Using " + com.velocitypowered.natives.util.Natives.cipher.getLoadedVariant() + " cipher from Velocity.");
 +            // Paper end - Use Velocity cipher

@@ -1,0 +1,68 @@
+name: "PR cleanup"
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: write
+    steps:
+      - name: Delete packages and gist
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const owner    = context.repo.owner;
+            const ownerType = context.payload.repository.owner.type;
+            
+            const packagesToNuke = [
+              `pr${prNumber}.io.papermc.paper.dev-bundle`,
+              `pr${prNumber}.io.papermc.paper.paper-api`
+            ];
+            
+            for (const pkg of packagesToNuke) {
+              try {
+                if (ownerType === 'Organization') {
+                  await github.rest.packages.deletePackageForOrg({
+                    org: owner,
+                    package_type: 'maven',
+                    package_name: pkg
+                  });
+                } else {
+                  await github.rest.packages.deletePackageForUser({
+                    username: owner,
+                    package_type: 'maven',
+                    package_name: pkg
+                  });
+                }
+                core.info(`✅ Deleted package '${pkg}'`);
+              } catch (err) {
+                core.warning(`⚠️  Could not delete '${pkg}': ${err.message}`);
+              }
+            }
+
+      - name: Delete gist
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GIST_PUBLISH_KEY }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            try {
+              const patchFile = `${prNumber}-rawdiff.patch`;
+              const gists = await github.paginate(github.rest.gists.list, {});
+              const target = gists.find(g => g.files && g.files[patchFile]);
+
+              if (target) {
+                await github.rest.gists.delete({ gist_id: target.id });
+                core.info(`✅ Deleted gist ${target.id}`);
+              } else {
+                core.info('ℹ️  No matching gist found.');
+              }
+            } catch (err) {
+              core.warning(`⚠️  Could not delete gist: ${err.message}`);
+            }

@@ -1,0 +1,51 @@
+name: "create-or-edit-gist"
+description: "Create or update a Gist by name and return its URL"
+inputs:
+  file_path:
+    description: "Local file path to read & sync"
+    required: true
+  token:
+    description: "GitHub token with gist access"
+    required: true
+outputs:
+  gist_url:
+    description: "URL of the created or updated Gist"
+    value: ${{ steps.sync.outputs.result }}
+runs:
+  using: "composite"
+  steps:
+    - name: Create or update Gist
+      id: sync
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.token }}
+        result-encoding: string
+        script: |
+          const fs   = require('fs/promises');
+          const path = require('path');
+
+          const filePath = '${{ inputs.file_path }}';
+          const fileContent = await fs.readFile(filePath, 'utf8');
+          const filename = path.basename(filePath);
+
+          const gists   = await github.paginate(github.rest.gists.list, {});
+          const current = gists.find(g => g.files && g.files[filename]);
+
+          const filesPayload = { [filename]: { content: fileContent } };
+
+          let res;
+          if (current) {
+            res = await github.rest.gists.update({
+              gist_id: current.id,
+              files: filesPayload
+            });
+            core.info(`✅ Updated gist ${current.id}`);
+          } else {
+            res = await github.rest.gists.create({
+              public: false,
+              files: filesPayload
+            });
+            core.info(`✅ Created gist ${res.data.id}`);
+          }
+
+          return res.data.html_url;
