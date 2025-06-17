@@ -59,6 +59,7 @@ jobs:
           EVENT: "${{ toJSON(github.event) }}"
           EVENT_TYPE: "${{ github.event_name }}"
         with:
+          result-encoding: string
           script: |
             const {owner, repo} = context.repo;
             const event_name = `${process.env.EVENT_TYPE}`;
@@ -66,25 +67,33 @@ jobs:
             const ref_type = `${process.env.REF_TYPE}`;
             const ref_name = `${process.env.REF_NAME}`;
             const result = {
-              action: "build"
+              paperclip: false,
+              diffpublish: false
             };
+            
+            async function processLabels(pr, pr_num) {
+              const names = pr.labels.map(l => l.name);
+              if (names.includes("publish-pr"))   result.paperclip    = true;
+              if (names.includes("publish-diff")) result.diffgenerator = true;
+              result["pr"] = pr_num;
+            }
+            
+            const marker_labels = ["publish-pr", "publish-diff"];
 
             if (event_name === "push" && ref_type === "branch") {
               const {data: pulls} = await github.rest.pulls.list({ owner, repo, head: `${owner}:${ref_name}`, state: "open" });
-              const pull = pulls.find((pr) => !!pr.labels.find((l) => l.name === "publish-pr"));
+              const pull = pulls.find(pr => !!pr.labels.some(l => marker_labels.includes(l.name)));
               if (pull) {
-                result["pr"] = pull.number;
-                result["action"] = "paperclip";
-                core.notice(`This is a push action but to a branch with an open PR with the build paperclip label (${JSON.stringify(result)})`);
+                processLabels(pull, pull.number);
+                core.notice(`This is a push action but to a branch with an open PR with a build marker label (${JSON.stringify(result)})`);
                 return result;
               }
-            } else if (event_name === "pull_request" && event.pull_request.labels.find((l) => l.name === "publish-pr")) {
-              result["pr"] = event.pull_request.number;
-              result["action"] = "paperclip";
-              core.notice(`This is a pull request action with a build paperclip label (${JSON.stringify(result)})`);
+            } else if (event_name === "pull_request" && event.pull_request.labels.some(l => marker_labels.includes(l.name))) {
+              processLabels(event.pull_request, event.pull_request.number);
+              core.notice(`This is a pull request action with a build marker label (${JSON.stringify(result)})`);
               return result;
             }
-            core.notice("This will not build a paperclip jar");
+            core.notice("This has no marker labels, so modifications to build will occur.");
             return result;
 
       - name: Apply Patches
@@ -103,20 +112,22 @@ jobs:
           name: Test Results
           path: |
             **/build/test-results/test/TEST-*.xml
-
+      - name: Trigger Diff-Publish Workflow
+        if: steps.determine.outputs.diffpublish == 'true'
+        uses: ./.github/workflows/diff_publish.yml
       - name: Create Paperclip Jar
-        if: fromJSON(steps.determine.outputs.result).action == 'paperclip'
+        if: steps.determine.outputs.paperclip == 'true'
         run: ./gradlew createMojmapPaperclipJar --stacktrace
 
       - name: Upload Paperclip Jar
-        if: fromJSON(steps.determine.outputs.result).action == 'paperclip'
+        if: steps.determine.outputs.paperclip == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: paper-${{ fromJSON(steps.determine.outputs.result).pr }}
+          name: steps.determine.outputs.paperclip == 'true'
           path: paper-server/build/libs/paper-paperclip-*-mojmap.jar
 
       - name: Publish Artifacts
-        if: fromJSON(steps.determine.outputs.result).action == 'paperclip'
+        if: steps.determine.outputs.paperclip == 'true'
         uses: PaperMC/action-pr-publishing/upload@paper
         with:
           # TODO fallback for failing javadoc
