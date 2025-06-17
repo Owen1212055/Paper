@@ -1,0 +1,38 @@
+name: Diff-Publish
+
+on:
+  workflow_call
+
+jobs:
+  generate-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.head_ref }}
+
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.base_ref }}
+          path: base
+
+      - name: Apply Patches & Build base
+        working-directory: base
+        run: |
+          git config --global user.email "no-reply@github.com"
+          git config --global user.name "GitHub Actions"
+          ./gradlew applyPatches build --stacktrace
+
+      - name: Copy and Diff
+        run: |
+          cp -R paper-server/src/minecraft/java head-java
+          cp -R base/paper-server/src/minecraft/java base-java
+          diff -ruN base-java head-java > patch-${{ github.event.inputs.pr_number }}.patch || true
+
+      - name: Upload patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: diff-patch-${{ github.event.inputs.pr_number }}
+          path: patch-${{ github.event.inputs.pr_number }}.patch
