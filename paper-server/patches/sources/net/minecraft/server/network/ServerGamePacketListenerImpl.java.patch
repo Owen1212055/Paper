@@ -132,7 +132,7 @@
 +            this.player.resetLastActionTime(); // CraftBukkit - SPIGOT-854
 +            this.disconnect(Component.translatable("multiplayer.disconnect.idling"), org.bukkit.event.player.PlayerKickEvent.Cause.IDLING); // Paper - kick event cause
 +        }
-+        // Paper start - Prevent causing expired keys from impacting new joins
++        // Paper start - Preventie causing expired keys from impacting new joins
 +        if (!this.hasLoggedExpiry && this.chatSession != null && this.chatSession.profilePublicKey().data().hasExpired()) {
 +            LOGGER.info("Player profile key for {} has expired!", this.player.getName().getString());
 +            this.hasLoggedExpiry = true;
