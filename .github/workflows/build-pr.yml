@@ -65,30 +65,6 @@ jobs:
             }
             core.notice("This has no marker labels, so modifications to build will occur.");
             return result;
-  build:
-    name: Build Paper
-    needs: setup
-    runs-on: ubuntu-latest
-    permissions:
-      checks: write
-    steps:
-      - name: Checkout action meta
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            .github
-      - name: Initialize Workspace
-        uses: ./.github/actions/init-workspace
-      - name: Build
-        run: ./gradlew build --stacktrace
-      - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        if: always()
-        with:
-          event_file: ${{ github.event_path }}
-          event_name: ${{ github.event_name }}
-          files: "**/build/test-results/test/TEST-*.xml"
-          comment_mode: off
   diffpublish:
     name: Generate Diff Patch
     needs: setup
