@@ -4,7 +4,6 @@ on:
 
 jobs:
   build:
-    name: Build Paper
     runs-on: ubuntu-latest
     needs: check
     steps:
