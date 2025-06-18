@@ -25,51 +25,13 @@ jobs:
       )
 
     runs-on: ubuntu-latest
-    outputs:
-      paperclip: ${{ fromJSON(steps.determine.outputs.result).paperclip }}
-      diffpublish: ${{ fromJSON(steps.determine.outputs.result).diffpublish }}
-    steps:
-      - name: Configure Build
-        uses: actions/github-script@v7
-        id: determine
-        env:
-          REF_NAME: "${{ github.ref_name }}"
-          REF_TYPE: "${{ github.ref_type }}"
-          EVENT: "${{ toJSON(github.event) }}"
-          EVENT_TYPE: "${{ github.event_name }}"
-        with:
-          result-encoding: json
-          script: |
-            const {owner, repo} = context.repo;
-            const event_name = `${process.env.EVENT_TYPE}`;
-            const event = JSON.parse(`${process.env.EVENT}`);
-            const ref_type = `${process.env.REF_TYPE}`;
-            const ref_name = `${process.env.REF_NAME}`;
-            const result = {
-              paperclip: false,
-              diffpublish: false
-            };
-            
-            function processLabels(pr) {
-              const names = pr.labels.map(l => l.name);
-              if (names.includes("publish-pr"))   result.paperclip    = true;
-              if (names.includes("publish-diff")) result.diffpublish = true;
-            }
-            
-            const marker_labels = ["publish-pr", "publish-diff"];
-            
-            if (event_name === "pull_request" && event.pull_request.labels.some(l => marker_labels.includes(l.name))) {
-              processLabels(event.pull_request);
-              core.notice(`This is a pull request action with a build marker label (${JSON.stringify(result)})`);
-              return result;
-            }
-            core.notice("This has no marker labels, so modifications to build will occur.");
-            return result;
+
+
   diffpublish:
     name: Generate Diff Patch
     needs: setup
     runs-on: ubuntu-latest
-    if: ${{ needs.setup.outputs.diffpublish == 'true' }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-diff') }}
     steps:
       - name: Checkout action meta
         uses: actions/checkout@v4
@@ -149,10 +111,10 @@ jobs:
             *Last updated for: ${{ github.event.pull_request.head.sha }}*
 
   paperclip:
-    name: Create & Publish Paperclip
+    name: Create & Publish Artifacts
     needs: setup
     runs-on: ubuntu-latest
-    if: ${{ needs.setup.outputs.paperclip == 'true' }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-pr') }}
     permissions:
       packages: write # To upload the PR
       actions: write # To get information about the uploading workflow run and to delete the run artifacts
