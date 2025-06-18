@@ -123,7 +123,7 @@ jobs:
         id: gen_repo_token
         uses: kattecon/gh-app-access-token-gen@v1
         with:
-          app_id: 1408328
+          app_id: 1425941
           private_key: ${{ secrets.PR_PUBLISHING_GH_APP_KEY }}
           repository: ${{ github.repository }}
       - name: Publish PR
