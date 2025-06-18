@@ -11,7 +11,7 @@ jobs:
   diffpublish:
     name: Generate Diff Patch
     runs-on: ubuntu-latest
-    if: ${{ github.event.action == 'labeled' && github.event.label.name == 'publish-diff' }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-diff') }}
     steps:
       - name: Checkout action meta
         uses: actions/checkout@v4
@@ -93,7 +93,7 @@ jobs:
   paperclip:
     name: Create & Publish Artifacts
     runs-on: ubuntu-latest
-    if: ${{ github.event.action == 'labeled' && github.event.label.name == 'publish-pr' }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-pr') }}
     permissions:
       packages: write # To upload the PR
       actions: write # To get information about the uploading workflow run and to delete the run artifacts
