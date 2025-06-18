@@ -141,6 +141,7 @@ jobs:
         run: |
           git format-patch -1 HEAD \
             --stdout \
+            --no-signature \
             -- . \
           > patch-${{ github.event.pull_request.number }}.patch
 
