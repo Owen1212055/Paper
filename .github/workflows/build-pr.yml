@@ -113,7 +113,7 @@ jobs:
           git config --global user.email "no-reply@github.com"
           git config --global user.name "GitHub Actions"
           ./gradlew applyPatches --stacktrace
-      - name: Generate raw diff
+      - name: Generate diff between files
         run: |
           diff \
             --unified=3 \
@@ -124,19 +124,17 @@ jobs:
             paper-server/src/minecraft/java \
             > raw.diff \
             || true
-      - name: Import diff into index
+      - name: Apply diff onto base paper server
         run: |
           git apply \
             --directory=base/paper-server \
             raw.diff
-      - name: Commit imported diff
+      - name: Commit diff
         working-directory: 'base/paper-server/src/minecraft/java'
         run: |
           git add .
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "Import directory diff for patch generation"
-      - name: Create patch
+          git commit -m "Generated Patches Diff"
+      - name: Generate commit patch
         working-directory: 'base/paper-server/src/minecraft/java'
         run: |
           git format-patch -1 HEAD \
@@ -144,13 +142,14 @@ jobs:
             --no-signature \
             -- . \
           > patch-${{ github.event.pull_request.number }}.patch
-
       - name: Upload patch to pastes.dev
         id: paste
         run: |
-          paste_url=$(curl -s -T base/paper-server/src/minecraft/java/patch-${{ github.event.pull_request.number }}.patch \
-          -H "Content-Type: text/x-diff" \
-          https://api.pastes.dev/post)
+          raw_url=$(curl -s -T base/paper-server/src/minecraft/java/patch-${{ github.event.pull_request.number }}.patch \
+            -H "Content-Type: text/x-diff" \
+            https://api.pastes.dev/post)
+          paste_url=$(echo "$raw_url" \
+            | sed -e 's|^https://pastes.dev/|https://api.pastes.dev/|')  
           echo "paste_url=$paste_url" >> $GITHUB_OUTPUT
       - name: Find existing Diff Viewer comment
         uses: peter-evans/find-comment@v3
