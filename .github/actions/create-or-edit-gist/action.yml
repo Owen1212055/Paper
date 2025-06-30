@@ -14,7 +14,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Create or update Gist
+    - name: github / upload gist
       id: sync
       uses: actions/github-script@v7
       with:

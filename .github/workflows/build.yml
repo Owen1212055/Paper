@@ -7,19 +7,19 @@ jobs:
     name: Build Paper
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout action meta
+      - name: git / checkout actions
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
             .github
-      - name: Initialize Workspace
+      - name: core / setup
         uses: ./.github/actions/init-workspace
         with:
           directory: .
           hash: ${{ github.sha }}
-      - name: Build
+      - name: gradle / build
         run: ./gradlew build --stacktrace
-      - name: Publish Test Results
+      - name: gradle / publish tests
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
           commit: ${{ github.sha }}

@@ -13,22 +13,22 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-diff') }}
     steps:
-      - name: Checkout action meta
+      - name: git / checkout actions
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
             .github
-      - name: Initialize Workspace
+      - name: core / setup
         uses: ./.github/actions/init-workspace
         with:
           directory: .
           hash: ${{ github.event.pull_request.head.sha }}
-      - name: Initialize Base Workspace
+      - name: core / setup base
         uses: ./.github/actions/init-workspace
         with:
           directory: base
           hash: ${{ github.event.pull_request.base.sha }}
-      - name: Generate diff between files
+      - name: git / generate diff between repos
         run: |
           diff \
             --unified=3 \
@@ -39,17 +39,17 @@ jobs:
             paper-server/src/minecraft/java \
             > raw.diff \
             || true
-      - name: Apply diff onto base paper server
+      - name: git / apply diff to base
         run: |
           git apply \
             --directory=base/paper-server \
             raw.diff
-      - name: Commit diff
+      - name: git / commit diff
         working-directory: 'base/paper-server/src/minecraft/java'
         run: |
           git add .
           git commit -m "Generated Patches Diff"
-      - name: Generate commit patch
+      - name: git / generate patch
         working-directory: 'base/paper-server/src/minecraft/java'
         run: |
           git format-patch -1 HEAD \
@@ -57,20 +57,20 @@ jobs:
             --no-signature \
             -- . \
           >${{ github.event.pull_request.number }}-rawdiff.patch
-      - name: Create Gist
+      - name: github / create gist
         uses: ./.github/actions/create-or-edit-gist
         id: gist
         with:
           token: ${{ secrets.GIST_PUBLISH_KEY }}
           file_path: 'base/paper-server/src/minecraft/java/${{ github.event.pull_request.number }}-rawdiff.patch'
-      - name: Find existing Diff Viewer comment
+      - name: github / find diff comment
         uses: peter-evans/find-comment@v3
         id: find_comment
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: 'github-actions[bot]'
           body-includes: '<!-- bot: diff-publish-pr -->'
-      - name: Create or update Diff Viewer comment
+      - name: github / create or edit diff comment
         uses: peter-evans/create-or-update-comment@v4
         with:
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
@@ -95,35 +95,35 @@ jobs:
       issues: write # To be able to create PR comments
       pull-requests: write # To be able to create PR comments
     steps:
-      - name: Checkout action meta
+      - name: git / checkout actions
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
             .github
-      - name: Initialize Workspace
+      - name: core / setup
         uses: ./.github/actions/init-workspace
         with:
           directory: .
           hash: ${{ github.event.pull_request.head.sha }}
-      - name: Create Paperclip Jar
+      - name: gradle / create mojang paperclip jar
         run: ./gradlew createMojmapPaperclipJar --stacktrace
-      - name: Upload Paperclip Jar
+      - name: github / upload jar
         uses: actions/upload-artifact@v4
         with:
           name: paper-${{ github.event.pull_request.number }}
           path: paper-server/build/libs/paper-paperclip-*-mojmap.jar
-      - name: Publish Artifacts
+      - name: github / publish publications
         uses: PaperMC/action-pr-publishing/upload@paper
         with:
           publishing-task: ":paper-api:publishAllPublicationsTo_githubPackages_PRsRepository publishDevBundlePublicationTo_githubPackages_PRsRepository -PpublishDevBundle"
-      - name: Generate an Application repository access token
+      - name: github / generate token
         id: gen_repo_token
         uses: kattecon/gh-app-access-token-gen@v1
         with:
           app_id: 1425941
           private_key: ${{ secrets.PR_PUBLISHING_GH_APP_KEY }}
           repository: ${{ github.repository }}
-      - name: Publish PR
+      - name: github / publish artifact
         uses: PaperMC/action-pr-publishing@paper-debugging
         env:
           GITHUB_TOKEN: ${{ steps.gen_repo_token.outputs.token }}
