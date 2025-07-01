@@ -1,0 +1,37 @@
+name: "Initialize Workspace"
+description: "Creates a base repo using specified commit and directory"
+inputs:
+  hash:
+    description: "Commit SHA or ref to check out"
+    required: true
+  directory:
+    description: "Subdirectory to run commands in"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: git / checkout
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.hash }}
+        path: ${{ inputs.directory }}
+    - name: git / setup identity
+      working-directory: ${{ inputs.directory }}
+      shell: bash
+      run: |
+        git config --global user.email "no-reply@github.com"
+        git config --global user.name "GitHub Actions"
+    - name: java / setup
+      uses: actions/setup-java@v4
+      with:
+        java-version: 21
+        distribution: 'zulu'
+    - name: gradle / setup
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        add-job-summary: 'on-failure'
+    - name: git / apply patches
+      working-directory: ${{ inputs.directory }}
+      shell: bash
+      run: |
+        ./gradlew applyPatches --stacktrace

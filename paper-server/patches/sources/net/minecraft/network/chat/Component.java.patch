@@ -7,7 +7,7 @@
 -public interface Component extends Message, FormattedText {
 +public interface Component extends Message, FormattedText, Iterable<Component> { // CraftBukkit
 +
-+    // CraftBukkit start
++    // CraftBukkit start - SUPER complicated change
 +    default java.util.stream.Stream<Component> stream() {
 +        return com.google.common.collect.Streams.concat(java.util.stream.Stream.of(this), this.getSiblings().stream().flatMap(Component::stream));
 +    }
