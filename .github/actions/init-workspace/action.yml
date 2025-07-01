@@ -10,17 +10,17 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: git / setup
-      working-directory: ${{ inputs.directory }}
-      shell: bash
-      run: |
-        git config --global user.email "no-reply@github.com"
-        git config --global user.name "GitHub Actions"
     - name: git / checkout
       uses: actions/checkout@v4
       with:
         ref: ${{ inputs.hash }}
         path: ${{ inputs.directory }}
+    - name: git / setup identity
+      working-directory: ${{ inputs.directory }}
+      shell: bash
+      run: |
+        git config --global user.email "no-reply@github.com"
+        git config --global user.name "GitHub Actions"
     - name: java / setup
       uses: actions/setup-java@v4
       with:
